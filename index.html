@@ -317,6 +317,7 @@
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setClearColor(0x1a2636, 1);
+  renderer.setClearColor(0x0b0f14, 1);
   wrap.appendChild(renderer.domElement);
 
   const aspect = () => window.innerWidth / window.innerHeight;
@@ -334,6 +335,9 @@
   const hemi = new THREE.HemisphereLight(0xb9e6ff, 0x24354d, 0.95);
   scene.add(hemi);
   const dir = new THREE.DirectionalLight(0xffffff, 0.6);
+  const hemi = new THREE.HemisphereLight(0x9ad7ff, 0x101018, 0.65);
+  scene.add(hemi);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.35);
   dir.position.set(-10, 25, 10);
   scene.add(dir);
 
@@ -538,6 +542,8 @@
     const shadow = new THREE.Mesh(
       new THREE.CircleGeometry(0.7, 24),
       new THREE.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:0.2 })
+      new THREE.CircleGeometry(0.6, 24),
+      new THREE.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:0.28 })
     );
     shadow.rotation.x = -Math.PI/2;
     shadow.position.y = 0.01;
@@ -555,6 +561,39 @@
       const sprite = makeSprite(SpriteArt.gloomling, 128, 2.3);
       sprite.position.y = 1.1;
       g.add(sprite);
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 1.2, 14), mat(0x1f72ff, 0x09203a, 0.25));
+      body.position.y = 0.7;
+      g.add(body);
+
+      const hood = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 16), mat(0x0f1b2c, 0x1a2a55, 0.15));
+      hood.position.y = 1.35;
+      g.add(hood);
+
+      const glow = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.85, 32), new THREE.MeshBasicMaterial({ color:0xfff2a8, transparent:true, opacity:0.25 }));
+      glow.rotation.x = -Math.PI/2;
+      glow.position.y = 0.02;
+      g.add(glow);
+
+      const sword = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.9, 0.2), mat(0xd7dbe6, 0x101018, 0.1));
+      sword.position.set(0.65, 0.85, 0);
+      g.add(sword);
+
+      return g;
+    }
+
+    // Enemy "models" (simple silhouettes)
+    if (kind === "gloomling") {
+      const blob = new THREE.Mesh(new THREE.SphereGeometry(0.55, 18, 18), mat(0x1b1f2a, 0x000000, 0.0));
+      blob.position.y = 0.7;
+      g.add(blob);
+      const eye1 = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 10), mat(0xfff2a8, 0xfff2a8, 1.2));
+      const eye2 = eye1.clone();
+      eye1.position.set(-0.18, 0.78, 0.35);
+      eye2.position.set( 0.18, 0.78, 0.35);
+      g.add(eye1, eye2);
+      const spikes = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.55, 10), mat(0x0c0f16));
+      spikes.position.set(0, 1.35, 0);
+      g.add(spikes);
       return g;
     }
 
@@ -562,6 +601,23 @@
       const sprite = makeSprite(SpriteArt.ashwolf, 128, 2.2);
       sprite.position.y = 1.0;
       g.add(sprite);
+      const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 0.7, 6, 14), mat(0x3a3f4a, 0x111318, 0.1));
+      torso.position.y = 0.75;
+      torso.rotation.z = Math.PI/2;
+      g.add(torso);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 14, 14), mat(0x2f343f, 0x151820, 0.08));
+      head.position.set(0.55, 0.85, 0);
+      g.add(head);
+      const ear1 = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.22, 10), mat(0x20242c));
+      const ear2 = ear1.clone();
+      ear1.position.set(0.62, 1.1, 0.14);
+      ear2.position.set(0.62, 1.1, -0.14);
+      ear1.rotation.x = Math.PI/2;
+      ear2.rotation.x = Math.PI/2;
+      g.add(ear1, ear2);
+      const ember = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 10), mat(0xff8a66, 0xff8a66, 1.1));
+      ember.position.set(0.72, 0.86, 0);
+      g.add(ember);
       return g;
     }
 
@@ -569,6 +625,18 @@
       const sprite = makeSprite(SpriteArt.hollowknight, 128, 2.4);
       sprite.position.y = 1.15;
       g.add(sprite);
+      const armor = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.52, 1.3, 14), mat(0x2a2f39, 0x0f1014, 0.15));
+      armor.position.y = 0.75;
+      g.add(armor);
+      const helm = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.55, 0.5), mat(0x20252e, 0x0a0b0e, 0.18));
+      helm.position.y = 1.35;
+      g.add(helm);
+      const visor = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.12, 0.06), mat(0xfff2a8, 0xfff2a8, 1.0));
+      visor.position.set(0, 1.33, 0.28);
+      g.add(visor);
+      const sword = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.1, 0.2), mat(0xbfc5d2, 0x111318, 0.08));
+      sword.position.set(0.75, 0.85, 0);
+      g.add(sword);
       return g;
     }
 
@@ -576,6 +644,17 @@
       const sprite = makeSprite(SpriteArt.wraith, 128, 2.6);
       sprite.position.y = 1.25;
       g.add(sprite);
+      const core = new THREE.Mesh(new THREE.SphereGeometry(0.45, 16, 16), mat(0x0f1b2c, 0x63d7ff, 0.35));
+      core.position.y = 0.9;
+      g.add(core);
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.08, 10, 24), new THREE.MeshBasicMaterial({ color:0x63d7ff, transparent:true, opacity:0.55 }));
+      halo.position.y = 0.95;
+      halo.rotation.x = Math.PI/2;
+      g.add(halo);
+      const tail = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.0, 16), mat(0x0b0f14, 0x2bbcff, 0.25));
+      tail.position.y = 0.25;
+      tail.rotation.x = Math.PI;
+      g.add(tail);
       return g;
     }
 
@@ -583,6 +662,24 @@
       const sprite = makeSprite(SpriteArt.dimlord, 128, 3.0);
       sprite.position.y = 1.4;
       g.add(sprite);
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.95, 1.7, 18), mat(0x1a0b12, 0x7a0c1f, 0.25));
+      base.position.y = 0.9;
+      g.add(base);
+      const crown = new THREE.Mesh(new THREE.TorusGeometry(0.85, 0.12, 12, 28), new THREE.MeshBasicMaterial({ color:0xff5b7e, transparent:true, opacity:0.45 }));
+      crown.position.y = 1.8;
+      crown.rotation.x = Math.PI/2;
+      g.add(crown);
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 12), mat(0xfff2a8, 0xfff2a8, 1.4));
+      eye.position.set(0, 1.25, 0.55);
+      g.add(eye);
+      const spikes = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.7, 10), mat(0x2a0f18, 0x7a0c1f, 0.12));
+      for (let i=0;i<5;i++){
+        const s = spikes.clone();
+        const ang = i*(Math.PI*2/5);
+        s.position.set(Math.cos(ang)*0.85, 1.5, Math.sin(ang)*0.35);
+        s.rotation.z = ang;
+        g.add(s);
+      }
       return g;
     }
 
@@ -607,6 +704,9 @@
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(areaBounds.w, areaBounds.h),
       new THREE.MeshStandardMaterial({ color:0xffffff, map: groundTexture, roughness:0.95, metalness:0.0 })
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(areaBounds.w, areaBounds.h),
+      new THREE.MeshStandardMaterial({ color:0x0f1520, roughness:1.0, metalness:0.0 })
     );
     ground.rotation.x = -Math.PI/2;
     grp.add(ground);
@@ -650,6 +750,55 @@
         const sprite = makeSprite(SpriteArt.spine, 128, rand(2.2, 2.8));
         sprite.position.set(x, 1.4, z);
         grp.add(sprite);
+        // huts / posts
+        const isHut = Math.random() < 0.35;
+        if (isHut) {
+          const hut = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.0, 0.9, 10), mat(0x2a3342));
+          hut.position.set(x, 0.45, z);
+          grp.add(hut);
+          const roof = new THREE.Mesh(new THREE.ConeGeometry(1.1, 0.8, 10), mat(0x1b222d));
+          roof.position.set(x, 1.1, z);
+          grp.add(roof);
+        } else {
+          const post = new THREE.Mesh(new THREE.BoxGeometry(0.25, 1.0, 0.25), mat(0x2b2b30));
+          post.position.set(x, 0.5, z);
+          grp.add(post);
+          const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 12), mat(0xfff2a8, 0xfff2a8, 0.8));
+          lamp.position.set(x, 1.05, z);
+          grp.add(lamp);
+        }
+      }
+
+      if (kind === "forest") {
+        // trees (dark trunks + faint ash leaves)
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.25, 1.5, 10), mat(0x1a1f28));
+        trunk.position.set(x, 0.75, z);
+        grp.add(trunk);
+        const canopy = new THREE.Mesh(new THREE.SphereGeometry(rand(0.55,0.85), 14, 14), mat(0x3a3f4a, 0x2a2f39, 0.05));
+        canopy.position.set(x, 1.7, z);
+        grp.add(canopy);
+      }
+
+      if (kind === "ruins") {
+        // broken pillars
+        const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.35, rand(0.6,1.7), 12), mat(0x2a2f39));
+        pillar.position.set(x, pillar.geometry.parameters.height/2, z);
+        pillar.rotation.y = rand(0, Math.PI);
+        grp.add(pillar);
+        if (Math.random()<0.25) {
+          const shard = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.2, 0.3), mat(0x1f2430));
+          shard.position.set(x+rand(-0.5,0.5), 0.1, z+rand(-0.5,0.5));
+          shard.rotation.y = rand(0, Math.PI);
+          grp.add(shard);
+        }
+      }
+
+      if (kind === "spire") {
+        // black spines
+        const spine = new THREE.Mesh(new THREE.ConeGeometry(rand(0.18,0.35), rand(1.0,2.6), 10), mat(0x0a0b10, 0x4a0b18, 0.08));
+        spine.position.set(x, spine.geometry.parameters.height/2, z);
+        spine.rotation.y = rand(0, Math.PI);
+        grp.add(spine);
       }
     }
 
@@ -1487,6 +1636,12 @@
     // background color brightens a bit as purified
     const base = new THREE.Color(0x1a2636);
     const lift = new THREE.Color(0x2f4663);
+    const targetFog = 0.055 - purifiedPct*0.018 - state.areaIndex*0.004;
+    scene.fog.density = lerp(scene.fog.density, clamp(targetFog, 0.024, 0.06), 0.06);
+
+    // background color brightens a bit as purified
+    const base = new THREE.Color(0x0b0f14);
+    const lift = new THREE.Color(0x142136);
     const c = base.clone().lerp(lift, purifiedPct*0.65);
     renderer.setClearColor(c, 1);
 
