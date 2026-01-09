@@ -1,0 +1,1708 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Echoes of the Last Light (Self-contained Three.js 2D RPG)</title>
+  <style>
+    html, body { margin:0; padding:0; height:100%; background:#0b0f14; overflow:hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    #wrap { position:relative; width:100%; height:100%; }
+    canvas { display:block; }
+    #hud {
+      position:absolute; left:12px; top:12px; z-index:2;
+      color:#e9f0ff; background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.12);
+      border-radius:12px; padding:10px 12px; min-width:260px; backdrop-filter: blur(6px);
+    }
+    #hud h1 { margin:0 0 6px 0; font-size:14px; letter-spacing:.3px; font-weight:700; opacity:.95; }
+    #bars { display:grid; gap:6px; margin-top:8px; }
+    .barrow { display:grid; grid-template-columns: 64px 1fr 52px; align-items:center; gap:8px; font-size:12px; opacity:.95; }
+    .bar { height:10px; border-radius:999px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.10); overflow:hidden; }
+    .fill { height:100%; width:50%; background:linear-gradient(90deg, rgba(120,240,255,.9), rgba(255,235,120,.95)); }
+    .fill.hp { background:linear-gradient(90deg, rgba(255,90,90,.95), rgba(255,190,120,.95)); }
+    #msg {
+      position:absolute; left:12px; bottom:12px; z-index:2;
+      color:#e9f0ff; background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.12);
+      border-radius:12px; padding:10px 12px; width:min(520px, calc(100% - 24px));
+      backdrop-filter: blur(6px); font-size:13px; line-height:1.35;
+    }
+    #controls {
+      position:absolute; right:12px; top:12px; z-index:2;
+      color:#e9f0ff; background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.12);
+      border-radius:12px; padding:10px 12px; width:260px; backdrop-filter: blur(6px);
+      font-size:12px; line-height:1.4;
+    }
+    #controls .k { display:inline-block; padding:1px 6px; border-radius:6px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.08); margin:0 2px; }
+    #overlay {
+      position:absolute; inset:0; z-index:3; display:flex; align-items:center; justify-content:center;
+      background:radial-gradient(circle at 50% 40%, rgba(30,40,60,.9), rgba(5,7,10,.98));
+      color:#e9f0ff; text-align:center; padding:24px;
+    }
+    #card {
+      max-width:720px; width:min(720px, 92vw);
+      border-radius:18px; border:1px solid rgba(255,255,255,.14);
+      background:rgba(0,0,0,.25); padding:18px 18px 14px 18px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.55);
+      backdrop-filter: blur(8px);
+    }
+    #card h2 { margin:0 0 8px 0; font-size:18px; letter-spacing:.2px; }
+    #card p { margin:10px 0; opacity:.92; }
+    #card ul { text-align:left; margin:10px auto 14px auto; max-width: 640px; opacity:.92; }
+    #btnrow { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:10px; }
+    button {
+      cursor:pointer; border:none; padding:10px 14px; border-radius:12px;
+      color:#0b0f14; background:linear-gradient(90deg, rgba(120,240,255,.95), rgba(255,235,120,.95));
+      font-weight:800; letter-spacing:.2px;
+    }
+    button.secondary {
+      color:#e9f0ff; background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.18);
+      font-weight:700;
+    }
+    #tiny { font-size:12px; opacity:.78; margin-top:10px; }
+    #bossBanner {
+      position:absolute; left:50%; top:10px; transform:translateX(-50%);
+      z-index:2; padding:8px 12px; border-radius:999px;
+      background:rgba(120,20,40,.35); border:1px solid rgba(255,120,140,.35);
+      color:#ffeaf0; font-weight:800; letter-spacing:.4px; display:none;
+    }
+  </style>
+</head>
+<body>
+<div id="wrap">
+  <div id="overlay">
+    <div id="card">
+      <h2>Echoes of the Last Light</h2>
+      <p>You are <b>Aerin</b>, the last Lightbearer. Restore shrines, push back the darkness, and reach the Black Spire.</p>
+      <ul>
+        <li><b>Fading Village</b> → <b>Ashwood Forest</b> → <b>Broken Sanctuary</b> → <b>The Black Spire</b></li>
+        <li>Defeat enemies, collect <b>Light Energy</b>, and <b>purify shrines</b> to unlock the next region.</li>
+        <li>Final battle: <b>The Dim Lord</b>.</li>
+      </ul>
+      <div id="btnrow">
+        <button id="startBtn">Start</button>
+        <button class="secondary" id="howBtn">Controls</button>
+        <button class="secondary" id="resetBtn">Reset Save</button>
+      </div>
+      <div id="tiny">No external assets. All models are generated with simple Three.js geometry.</div>
+      <div id="how" style="display:none; margin-top:10px; opacity:.92; text-align:left;">
+        <div><span class="k">W</span><span class="k">A</span><span class="k">S</span><span class="k">D</span> Move</div>
+        <div><span class="k">Shift</span> Sprint</div>
+        <div><span class="k">Space</span> Attack (melee arc)</div>
+        <div><span class="k">E</span> Interact (Shrines / Gate)</div>
+        <div><span class="k">1</span> / <span class="k">2</span> / <span class="k">3</span> Quick skills (unlocked gradually)</div>
+        <div><span class="k">Esc</span> Pause</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="hud">
+    <h1 id="areaTitle">—</h1>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; font-size:12px; opacity:.95">
+      <div><b>Hero:</b> Aerin</div>
+      <div><b>Weapon:</b> <span id="weaponName">Rusted Sword</span></div>
+      <div><b>Enemies:</b> <span id="enemyCount">0</span></div>
+    </div>
+
+    <div id="bars">
+      <div class="barrow">
+        <div><b>HP</b></div>
+        <div class="bar"><div class="fill hp" id="hpFill"></div></div>
+        <div style="text-align:right" id="hpText">100/100</div>
+      </div>
+      <div class="barrow">
+        <div><b>Light</b></div>
+        <div class="bar"><div class="fill" id="lightFill"></div></div>
+        <div style="text-align:right" id="lightText">0</div>
+      </div>
+      <div class="barrow">
+        <div><b>Shrines</b></div>
+        <div style="font-size:12px; opacity:.95" id="shrineText">0/1 purified</div>
+        <div style="text-align:right; font-size:12px; opacity:.85" id="gateText">Gate: Locked</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="controls">
+    <div style="font-weight:800; margin-bottom:6px;">Controls</div>
+    <div><span class="k">WASD</span> Move • <span class="k">Shift</span> Sprint</div>
+    <div><span class="k">Space</span> Attack • <span class="k">E</span> Interact</div>
+    <div><span class="k">1</span> Flash (dash) • <span class="k">2</span> Glow (heal) • <span class="k">3</span> Beam (ranged)</div>
+    <div style="margin-top:8px; opacity:.88">
+      Purify shrines to unlock the gate. Fight inside the light to stay safe.
+    </div>
+  </div>
+
+  <div id="bossBanner">BOSS: THE DIM LORD</div>
+  <div id="msg">Press Start to begin.</div>
+</div>
+
+<!-- Three.js (CDN). Everything else is in this single file. -->
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+
+<script>
+(() => {
+  "use strict";
+
+  // =========================
+  // Utilities
+  // =========================
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a,b,t) => a + (b-a)*t;
+  const rand = (a,b) => a + Math.random()*(b-a);
+  const pick = (arr) => arr[Math.floor(Math.random()*arr.length)];
+  const dist2 = (ax,ay,bx,by) => {
+    const dx=ax-bx, dy=ay-by;
+    return dx*dx + dy*dy;
+  };
+
+  // =========================
+  // Save / Progress
+  // =========================
+  const SAVE_KEY = "echoes_last_light_save_v1";
+  function loadSave() {
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch { return null; }
+  }
+  function writeSave(data) {
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch {}
+  }
+  function clearSave() {
+    try { localStorage.removeItem(SAVE_KEY); } catch {}
+  }
+
+  // =========================
+  // Game Data (Story, Locations, Enemies)
+  // =========================
+  const Areas = [
+    {
+      id: "village",
+      name: "Fading Village",
+      story: [
+        "The Beacon is dark. The village lanterns flicker like dying stars.",
+        "Elder Mira whispers: “Shrines still breathe. Wake them, and the path will open.”"
+      ],
+      bounds: { w: 42, h: 24 },
+      shrineCount: 1,
+      enemyWaves: [
+        { count: 5, types: ["Gloomling"] }
+      ],
+      decor: "village",
+      gateTo: "forest",
+      unlocks: { skill1: true }
+    },
+    {
+      id: "forest",
+      name: "Ashwood Forest",
+      story: [
+        "Ash settles on the leaves. Every footstep stirs a quiet, hungry dark.",
+        "Aerin feels warmth in the air—like the world remembers light."
+      ],
+      bounds: { w: 50, h: 28 },
+      shrineCount: 1,
+      enemyWaves: [
+        { count: 5, types: ["Gloomling", "Ash Wolf"] },
+        { count: 1, types: ["Lantern Wraith"] }
+      ],
+      decor: "forest",
+      gateTo: "sanctuary",
+      unlocks: { skill2: true, weapon: "Lightblade (Awakened)" }
+    },
+    {
+      id: "sanctuary",
+      name: "Broken Sanctuary",
+      story: [
+        "Stone halls cracked by old prayers. Lightkeeper sigils lie shattered.",
+        "A corrupted oath still walks here—steel scraping against memory."
+      ],
+      bounds: { w: 54, h: 30 },
+      shrineCount: 1,
+      enemyWaves: [
+        { count: 4, types: ["Hollow Knight"] },
+        { count: 2, types: ["Lantern Wraith"] }
+      ],
+      decor: "ruins",
+      gateTo: "spire",
+      unlocks: { skill3: true }
+    },
+    {
+      id: "spire",
+      name: "The Black Spire",
+      story: [
+        "The air tightens. Sound thins. The darkness has a throne.",
+        "A voice: “Light is a debt. Come pay it.”"
+      ],
+      bounds: { w: 46, h: 26 },
+      shrineCount: 1,
+      enemyWaves: [
+        { count: 6, types: ["Gloomling", "Ash Wolf", "Hollow Knight"] },
+        { count: 1, types: ["The Dim Lord"] }
+      ],
+      decor: "spire",
+      gateTo: null,
+      unlocks: {}
+    }
+  ];
+
+  const EnemyDefs = {
+    "Gloomling": {
+      name: "Gloomling",
+      hp: 25,
+      speed: 2.2,
+      dmg: 8,
+      drop: 10,
+      ai: "chase",
+      model: "gloomling"
+    },
+    "Ash Wolf": {
+      name: "Ash Wolf",
+      hp: 32,
+      speed: 3.2,
+      dmg: 10,
+      drop: 14,
+      ai: "pounce",
+      model: "ashwolf"
+    },
+    "Hollow Knight": {
+      name: "Hollow Knight",
+      hp: 60,
+      speed: 1.8,
+      dmg: 14,
+      drop: 28,
+      ai: "guard",
+      model: "hollowknight"
+    },
+    "Lantern Wraith": {
+      name: "Lantern Wraith",
+      hp: 45,
+      speed: 2.4,
+      dmg: 12,
+      drop: 24,
+      ai: "drain",
+      model: "wraith"
+    },
+    "The Dim Lord": {
+      name: "The Dim Lord",
+      hp: 260,
+      speed: 1.65,
+      dmg: 18,
+      drop: 0,
+      ai: "boss",
+      model: "dimlord"
+    }
+  };
+
+  // =========================
+  // Three.js Setup (Orthographic = clean 2D top-down)
+  // =========================
+  const wrap = document.getElementById("wrap");
+  const msgEl = document.getElementById("msg");
+  const overlay = document.getElementById("overlay");
+  const areaTitle = document.getElementById("areaTitle");
+  const enemyCountEl = document.getElementById("enemyCount");
+  const hpFill = document.getElementById("hpFill");
+  const hpText = document.getElementById("hpText");
+  const lightFill = document.getElementById("lightFill");
+  const lightText = document.getElementById("lightText");
+  const shrineText = document.getElementById("shrineText");
+  const gateText = document.getElementById("gateText");
+  const weaponNameEl = document.getElementById("weaponName");
+  const bossBanner = document.getElementById("bossBanner");
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x1a2636, 0.02);
+
+  const renderer = new THREE.WebGLRenderer({ antialias:true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x1a2636, 1);
+  wrap.appendChild(renderer.domElement);
+
+  const aspect = () => window.innerWidth / window.innerHeight;
+  let viewSize = 18; // world units visible vertically
+  let camera = new THREE.OrthographicCamera(
+    -viewSize*aspect()/2, viewSize*aspect()/2,
+    viewSize/2, -viewSize/2,
+    0.1, 200
+  );
+  camera.position.set(0, 30, 0); // top-down
+  camera.up.set(0,0,-1);
+  camera.lookAt(0, 0, 0);
+
+  // Lights (subtle; most look comes from materials)
+  const hemi = new THREE.HemisphereLight(0xb9e6ff, 0x24354d, 0.95);
+  scene.add(hemi);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.6);
+  dir.position.set(-10, 25, 10);
+  scene.add(dir);
+
+  window.addEventListener("resize", () => {
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    camera.left = -viewSize*aspect()/2;
+    camera.right = viewSize*aspect()/2;
+    camera.top = viewSize/2;
+    camera.bottom = -viewSize/2;
+    camera.updateProjectionMatrix();
+  });
+
+  // =========================
+  // Materials / Palette helpers
+  // =========================
+  const mat = (color, emissive=0x000000, eInt=0.0) =>
+    new THREE.MeshStandardMaterial({ color, emissive, emissiveIntensity:eInt, roughness:0.9, metalness:0.05 });
+
+  const flatMat = (color) =>
+    new THREE.MeshLambertMaterial({ color });
+
+  // =========================
+  // Sprite helpers (self-contained 2D art)
+  // =========================
+  function makeSpriteTexture(drawFn, size = 128) {
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, size, size);
+    drawFn(ctx, size);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.NearestFilter;
+    return tex;
+  }
+
+  function makeSprite(drawFn, size, scale) {
+    const tex = makeSpriteTexture(drawFn, size);
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(scale, scale, 1);
+    return sprite;
+  }
+
+  function drawGlow(ctx, size, color) {
+    const grad = ctx.createRadialGradient(size/2, size/2, size*0.1, size/2, size/2, size*0.48);
+    grad.addColorStop(0, color);
+    grad.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(size/2, size/2, size*0.48, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  const SpriteArt = {
+    hero: (ctx, size) => {
+      ctx.fillStyle = "#0f1b2c";
+      ctx.beginPath();
+      ctx.ellipse(size*0.5, size*0.58, size*0.18, size*0.24, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = "#1f72ff";
+      ctx.beginPath();
+      ctx.ellipse(size*0.5, size*0.62, size*0.14, size*0.2, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = "#ffeaa0";
+      ctx.beginPath();
+      ctx.arc(size*0.58, size*0.52, size*0.03, 0, Math.PI*2);
+      ctx.fill();
+      drawGlow(ctx, size, "rgba(255,240,180,0.5)");
+    },
+    gloomling: (ctx, size) => {
+      ctx.fillStyle = "#1b1f2a";
+      ctx.beginPath();
+      ctx.arc(size*0.5, size*0.6, size*0.18, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = "#fff2a8";
+      ctx.beginPath();
+      ctx.arc(size*0.45, size*0.58, size*0.03, 0, Math.PI*2);
+      ctx.arc(size*0.55, size*0.58, size*0.03, 0, Math.PI*2);
+      ctx.fill();
+    },
+    ashwolf: (ctx, size) => {
+      ctx.fillStyle = "#3a3f4a";
+      ctx.fillRect(size*0.28, size*0.56, size*0.44, size*0.18);
+      ctx.beginPath();
+      ctx.arc(size*0.72, size*0.6, size*0.09, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = "#ff8a66";
+      ctx.beginPath();
+      ctx.arc(size*0.76, size*0.6, size*0.03, 0, Math.PI*2);
+      ctx.fill();
+    },
+    hollowknight: (ctx, size) => {
+      ctx.fillStyle = "#2a2f39";
+      ctx.fillRect(size*0.36, size*0.5, size*0.28, size*0.28);
+      ctx.fillStyle = "#20252e";
+      ctx.fillRect(size*0.34, size*0.42, size*0.32, size*0.14);
+      ctx.fillStyle = "#fff2a8";
+      ctx.fillRect(size*0.4, size*0.48, size*0.2, size*0.04);
+    },
+    wraith: (ctx, size) => {
+      drawGlow(ctx, size, "rgba(99,215,255,0.7)");
+      ctx.fillStyle = "rgba(15,27,44,0.8)";
+      ctx.beginPath();
+      ctx.arc(size*0.5, size*0.58, size*0.14, 0, Math.PI*2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(99,215,255,0.9)";
+      ctx.lineWidth = size*0.04;
+      ctx.beginPath();
+      ctx.arc(size*0.5, size*0.58, size*0.2, 0, Math.PI*2);
+      ctx.stroke();
+    },
+    dimlord: (ctx, size) => {
+      ctx.fillStyle = "#1a0b12";
+      ctx.fillRect(size*0.36, size*0.44, size*0.28, size*0.36);
+      ctx.fillStyle = "#ff5b7e";
+      ctx.beginPath();
+      ctx.arc(size*0.5, size*0.44, size*0.14, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = "#fff2a8";
+      ctx.beginPath();
+      ctx.arc(size*0.5, size*0.54, size*0.03, 0, Math.PI*2);
+      ctx.fill();
+    },
+    shrine: (ctx, size) => {
+      ctx.fillStyle = "#2a2f39";
+      ctx.fillRect(size*0.34, size*0.62, size*0.32, size*0.14);
+      ctx.fillStyle = "#1f2430";
+      ctx.beginPath();
+      ctx.moveTo(size*0.5, size*0.22);
+      ctx.lineTo(size*0.32, size*0.62);
+      ctx.lineTo(size*0.68, size*0.62);
+      ctx.closePath();
+      ctx.fill();
+      drawGlow(ctx, size, "rgba(99,215,255,0.4)");
+    },
+    gate: (ctx, size) => {
+      ctx.strokeStyle = "#cfd6e6";
+      ctx.lineWidth = size*0.06;
+      ctx.strokeRect(size*0.28, size*0.28, size*0.44, size*0.44);
+      ctx.strokeStyle = "rgba(255,242,168,0.7)";
+      ctx.beginPath();
+      ctx.arc(size*0.5, size*0.5, size*0.14, 0, Math.PI*2);
+      ctx.stroke();
+    },
+    hut: (ctx, size) => {
+      ctx.fillStyle = "#2a3342";
+      ctx.fillRect(size*0.32, size*0.55, size*0.36, size*0.2);
+      ctx.fillStyle = "#1b222d";
+      ctx.beginPath();
+      ctx.moveTo(size*0.3, size*0.55);
+      ctx.lineTo(size*0.5, size*0.32);
+      ctx.lineTo(size*0.7, size*0.55);
+      ctx.closePath();
+      ctx.fill();
+    },
+    lamp: (ctx, size) => {
+      ctx.fillStyle = "#2b2b30";
+      ctx.fillRect(size*0.48, size*0.45, size*0.04, size*0.25);
+      ctx.fillStyle = "#fff2a8";
+      ctx.beginPath();
+      ctx.arc(size*0.5, size*0.42, size*0.07, 0, Math.PI*2);
+      ctx.fill();
+      drawGlow(ctx, size, "rgba(255,242,168,0.5)");
+    },
+    tree: (ctx, size) => {
+      ctx.fillStyle = "#1a1f28";
+      ctx.fillRect(size*0.48, size*0.45, size*0.04, size*0.2);
+      ctx.fillStyle = "#3a3f4a";
+      ctx.beginPath();
+      ctx.arc(size*0.5, size*0.4, size*0.16, 0, Math.PI*2);
+      ctx.fill();
+    },
+    pillar: (ctx, size) => {
+      ctx.fillStyle = "#2a2f39";
+      ctx.fillRect(size*0.44, size*0.4, size*0.12, size*0.35);
+      ctx.fillStyle = "#1f2430";
+      ctx.fillRect(size*0.4, size*0.36, size*0.2, size*0.06);
+    },
+    spine: (ctx, size) => {
+      ctx.fillStyle = "#0a0b10";
+      ctx.beginPath();
+      ctx.moveTo(size*0.5, size*0.2);
+      ctx.lineTo(size*0.38, size*0.78);
+      ctx.lineTo(size*0.62, size*0.78);
+      ctx.closePath();
+      ctx.fill();
+      drawGlow(ctx, size, "rgba(122,11,24,0.35)");
+    }
+  };
+
+  // =========================
+  // Model Factory (Enemies + Locations)
+  // =========================
+  function makeModel(kind) {
+    const g = new THREE.Group();
+    g.userData.kind = kind;
+
+    // A small drop shadow plane for readability
+    const shadow = new THREE.Mesh(
+      new THREE.CircleGeometry(0.7, 24),
+      new THREE.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:0.2 })
+    );
+    shadow.rotation.x = -Math.PI/2;
+    shadow.position.y = 0.01;
+    g.add(shadow);
+
+    if (kind === "hero") {
+      const sprite = makeSprite(SpriteArt.hero, 128, 2.6);
+      sprite.position.y = 1.2;
+      g.add(sprite);
+      return g;
+    }
+
+    // Enemy sprites (simple silhouettes)
+    if (kind === "gloomling") {
+      const sprite = makeSprite(SpriteArt.gloomling, 128, 2.3);
+      sprite.position.y = 1.1;
+      g.add(sprite);
+      return g;
+    }
+
+    if (kind === "ashwolf") {
+      const sprite = makeSprite(SpriteArt.ashwolf, 128, 2.2);
+      sprite.position.y = 1.0;
+      g.add(sprite);
+      return g;
+    }
+
+    if (kind === "hollowknight") {
+      const sprite = makeSprite(SpriteArt.hollowknight, 128, 2.4);
+      sprite.position.y = 1.15;
+      g.add(sprite);
+      return g;
+    }
+
+    if (kind === "wraith") {
+      const sprite = makeSprite(SpriteArt.wraith, 128, 2.6);
+      sprite.position.y = 1.25;
+      g.add(sprite);
+      return g;
+    }
+
+    if (kind === "dimlord") {
+      const sprite = makeSprite(SpriteArt.dimlord, 128, 3.0);
+      sprite.position.y = 1.4;
+      g.add(sprite);
+      return g;
+    }
+
+    return g;
+  }
+
+  function makeLocationDecor(kind, areaBounds) {
+    const grp = new THREE.Group();
+
+    // ground
+    const groundTexture = makeSpriteTexture((ctx, size) => {
+      ctx.fillStyle = kind === "forest" ? "#2c3d2f" : (kind === "spire" ? "#2a1f2a" : "#2c3342");
+      ctx.fillRect(0, 0, size, size);
+      for (let i=0;i<120;i++) {
+        ctx.fillStyle = "rgba(255,255,255,0.05)";
+        ctx.fillRect(Math.random()*size, Math.random()*size, 2, 2);
+      }
+    }, 128);
+    groundTexture.wrapS = THREE.RepeatWrapping;
+    groundTexture.wrapT = THREE.RepeatWrapping;
+    groundTexture.repeat.set(areaBounds.w/6, areaBounds.h/6);
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(areaBounds.w, areaBounds.h),
+      new THREE.MeshStandardMaterial({ color:0xffffff, map: groundTexture, roughness:0.95, metalness:0.0 })
+    );
+    ground.rotation.x = -Math.PI/2;
+    grp.add(ground);
+
+    // border walls (invisible collisions handled separately)
+    // visual border
+    const border = new THREE.Mesh(
+      new THREE.RingGeometry(Math.min(areaBounds.w,areaBounds.h)*0.52, Math.min(areaBounds.w,areaBounds.h)*0.55, 64),
+      new THREE.MeshBasicMaterial({ color:0x0b0f14, transparent:true, opacity:0.22 })
+    );
+    border.rotation.x = -Math.PI/2;
+    border.position.y = 0.02;
+    grp.add(border);
+
+    // props
+    const propCount = Math.floor((areaBounds.w*areaBounds.h)/55);
+    for (let i=0;i<propCount;i++) {
+      const x = rand(-areaBounds.w/2+2, areaBounds.w/2-2);
+      const z = rand(-areaBounds.h/2+2, areaBounds.h/2-2);
+
+      if (kind === "village") {
+        const isHut = Math.random() < 0.35;
+        const sprite = makeSprite(isHut ? SpriteArt.hut : SpriteArt.lamp, 128, isHut ? 2.4 : 2.0);
+        sprite.position.set(x, 1.1, z);
+        grp.add(sprite);
+      }
+
+      if (kind === "forest") {
+        const sprite = makeSprite(SpriteArt.tree, 128, rand(2.2, 2.8));
+        sprite.position.set(x, 1.4, z);
+        grp.add(sprite);
+      }
+
+      if (kind === "ruins") {
+        const sprite = makeSprite(SpriteArt.pillar, 128, rand(2.0, 2.6));
+        sprite.position.set(x, 1.2, z);
+        grp.add(sprite);
+      }
+
+      if (kind === "spire") {
+        const sprite = makeSprite(SpriteArt.spine, 128, rand(2.2, 2.8));
+        sprite.position.set(x, 1.4, z);
+        grp.add(sprite);
+      }
+    }
+
+    return grp;
+  }
+
+  // =========================
+  // Game State
+  // =========================
+  const state = {
+    running: false,
+    paused: false,
+    time: 0,
+    dt: 0,
+    areaIndex: 0,
+    area: Areas[0],
+    bounds: { w: 42, h: 24 },
+    shrinePurified: 0,
+    shrineTotal: 1,
+    gateUnlocked: false,
+
+    hero: {
+      x: 0, z: 6,
+      vx: 0, vz: 0,
+      speed: 4.0,
+      hp: 100, hpMax: 100,
+      light: 0,
+      facing: 0, // radians
+      sprint: false,
+      weapon: "Rusted Sword",
+      dmg: 18,
+      atkCooldown: 0,
+      invuln: 0,
+      skill: { flash:false, glow:false, beam:false },
+      cd: { flash:0, glow:0, beam:0 },
+      beamShots: []
+    },
+
+    enemies: [],
+    shrines: [],
+    gate: null,
+
+    storyQueue: [],
+    lastMsgAt: 0,
+    darkness: 0.82 // baseline gloom; reduced by shrine light
+  };
+
+  // Scene containers
+  const world = new THREE.Group();
+  scene.add(world);
+
+  let areaDecor = null;
+  let heroModel = null;
+
+  // =========================
+  // Input
+  // =========================
+  const keys = new Set();
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      if (!state.running) return;
+      state.paused = !state.paused;
+      pushMsg(state.paused ? "Paused. Press Esc to resume." : "Resumed.");
+      return;
+    }
+    keys.add(e.key.toLowerCase());
+
+    // Prevent page scroll on space
+    if (e.key === " " || e.code === "Space") e.preventDefault();
+
+    if (!state.running || state.paused) return;
+
+    if (e.key === " " || e.code === "Space") {
+      tryAttack();
+    }
+    if (e.key.toLowerCase() === "e") {
+      tryInteract();
+    }
+    if (e.key === "1") trySkillFlash();
+    if (e.key === "2") trySkillGlow();
+    if (e.key === "3") trySkillBeam();
+  }, { passive:false });
+
+  window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
+
+  let mouse = { x:0, y:0, worldX:0, worldZ:0 };
+  renderer.domElement.addEventListener("mousemove", (e) => {
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
+
+    // Raycast to ground plane y=0
+    const ndc = new THREE.Vector3(mouse.x, mouse.y, 0);
+    ndc.unproject(camera);
+    // Because orthographic camera, unproject gives world point on near plane; cast straight down (Y axis).
+    // We can derive worldX/Z directly using camera projection scaling:
+    // Simpler: use a ray from camera through ndc and intersect plane.
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera({ x:mouse.x, y:mouse.y }, camera);
+    const plane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
+    const hit = new THREE.Vector3();
+    raycaster.ray.intersectPlane(plane, hit);
+    mouse.worldX = hit.x;
+    mouse.worldZ = hit.z;
+  });
+
+  // =========================
+  // UI helpers
+  // =========================
+  function pushMsg(text) {
+    msgEl.textContent = text;
+    state.lastMsgAt = state.time;
+  }
+
+  function setStory(lines) {
+    state.storyQueue = [...lines];
+    if (state.storyQueue.length) {
+      pushMsg(state.storyQueue.shift());
+    }
+  }
+
+  // =========================
+  // World Build / Area Load
+  // =========================
+  function clearWorld() {
+    while (world.children.length) world.remove(world.children[0]);
+    if (areaDecor) areaDecor = null;
+    state.enemies.length = 0;
+    state.shrines.length = 0;
+    state.gate = null;
+    bossBanner.style.display = "none";
+  }
+
+  function buildShrine(x, z, idx) {
+    const g = new THREE.Group();
+    g.position.set(x, 0, z);
+
+    const shrineSprite = makeSprite(SpriteArt.shrine, 128, 3.0);
+    shrineSprite.position.y = 1.3;
+    g.add(shrineSprite);
+
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 1.1, 0.5, 16), mat(0x2a2f39));
+    base.position.y = 0.25;
+    g.add(base);
+
+    const obelisk = new THREE.Mesh(new THREE.ConeGeometry(0.65, 1.7, 16), mat(0x1f2430, 0x63d7ff, 0.0));
+    obelisk.position.y = 1.35;
+    g.add(obelisk);
+
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(1.0, 1.35, 40),
+      new THREE.MeshBasicMaterial({ color:0x63d7ff, transparent:true, opacity:0.0 })
+    );
+    ring.rotation.x = -Math.PI/2;
+    ring.position.y = 0.02;
+    g.add(ring);
+
+    const shrine = {
+      id: "shrine_"+idx,
+      x, z,
+      purified: false,
+      model: g,
+      ring,
+      obelisk
+    };
+    world.add(g);
+    state.shrines.push(shrine);
+    return shrine;
+  }
+
+  function buildGate(x, z) {
+    const g = new THREE.Group();
+    g.position.set(x, 0, z);
+
+    const gateSprite = makeSprite(SpriteArt.gate, 128, 3.6);
+    gateSprite.position.y = 1.4;
+    g.add(gateSprite);
+
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.0, 0.4), mat(0x2a2f39));
+    frame.position.y = 1.0;
+    g.add(frame);
+
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.6, 0.2), mat(0x0f1520, 0x63d7ff, 0.0));
+    door.position.set(0, 0.95, 0.21);
+    g.add(door);
+
+    const sigil = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.08, 10, 28), new THREE.MeshBasicMaterial({ color:0xfff2a8, transparent:true, opacity:0.15 }));
+    sigil.position.set(0, 1.2, 0.35);
+    sigil.rotation.x = Math.PI/2;
+    g.add(sigil);
+
+    const gate = {
+      x, z,
+      unlocked: false,
+      model: g,
+      door,
+      sigil
+    };
+    world.add(g);
+    state.gate = gate;
+  }
+
+  function spawnEnemy(type, x, z) {
+    const def = EnemyDefs[type];
+    const model = makeModel(def.model);
+    model.position.set(x, 0, z);
+    world.add(model);
+
+    const enemy = {
+      type,
+      name: def.name,
+      hp: def.hp,
+      hpMax: def.hp,
+      speed: def.speed,
+      dmg: def.dmg,
+      drop: def.drop,
+      ai: def.ai,
+      x, z,
+      vx:0, vz:0,
+      cd:0,
+      model,
+      hitFlash:0,
+      bossPhase: 1
+    };
+
+    if (type === "The Dim Lord") {
+      bossBanner.style.display = "block";
+      bossBanner.textContent = "BOSS: THE DIM LORD";
+    }
+
+    state.enemies.push(enemy);
+    return enemy;
+  }
+
+  function spawnWave(wave) {
+    const { count, types } = wave;
+    const w = state.bounds.w, h = state.bounds.h;
+    let spawned = 0;
+    while (spawned < count) {
+      const type = pick(types);
+      const x = rand(-w/2+2, w/2-2);
+      const z = rand(-h/2+2, h/2-2);
+
+      // avoid spawning too close to hero
+      if (dist2(x,z,state.hero.x,state.hero.z) < 25) continue;
+      spawnEnemy(type, x, z);
+      spawned++;
+    }
+  }
+
+  function loadAreaByIndex(idx, fromSave=false) {
+    state.areaIndex = clamp(idx, 0, Areas.length-1);
+    state.area = Areas[state.areaIndex];
+    state.bounds = { ...state.area.bounds };
+    state.shrineTotal = state.area.shrineCount;
+    state.shrinePurified = 0;
+    state.gateUnlocked = false;
+    state.darkness = 0.86 - state.areaIndex*0.06;
+
+    clearWorld();
+
+    // Decor
+    areaDecor = makeLocationDecor(state.area.decor, state.bounds);
+    world.add(areaDecor);
+
+    // Hero model
+    heroModel = makeModel("hero");
+    world.add(heroModel);
+
+    // Place hero
+    state.hero.x = 0;
+    state.hero.z = state.bounds.h/2 - 4;
+    state.hero.vx = state.hero.vz = 0;
+
+    // Place shrines
+    for (let i=0;i<state.shrineTotal;i++) {
+      const x = (i===0 ? 0 : rand(-state.bounds.w/4, state.bounds.w/4));
+      const z = rand(-state.bounds.h/4, 0);
+      buildShrine(x, z, i);
+    }
+
+    // Gate position (always near bottom edge)
+    if (state.area.gateTo) {
+      buildGate(0, -state.bounds.h/2 + 2.5);
+    }
+
+    // Spawn enemies from waves (simple: spawn all waves upfront in early areas; later can feel busier)
+    state.enemies.length = 0;
+    for (const wave of state.area.enemyWaves) spawnWave(wave);
+
+    // Apply unlocks
+    if (state.area.unlocks?.skill1) state.hero.skill.flash = true;
+    if (state.area.unlocks?.skill2) state.hero.skill.glow = true;
+    if (state.area.unlocks?.skill3) state.hero.skill.beam = true;
+    if (state.area.unlocks?.weapon) {
+      state.hero.weapon = state.area.unlocks.weapon;
+      state.hero.dmg = 24;
+      weaponNameEl.textContent = state.hero.weapon;
+    } else {
+      weaponNameEl.textContent = state.hero.weapon;
+    }
+
+    // Story
+    setStory(state.area.story);
+
+    // If loading from save, restore shrine count + position
+    if (fromSave) {
+      // already set by loadGameFromSave
+    }
+
+    updateHUD();
+  }
+
+  // =========================
+  // Combat / Interaction
+  // =========================
+  function tryAttack() {
+    if (state.hero.atkCooldown > 0) return;
+    state.hero.atkCooldown = 0.35;
+
+    // attack arc in front of hero, based on facing
+    const arcRange = 2.2;
+    const arcCos = Math.cos(Math.PI * 0.45); // ~80 deg cone
+    let hits = 0;
+
+    for (const e of state.enemies) {
+      if (e.hp <= 0) continue;
+      const dx = e.x - state.hero.x;
+      const dz = e.z - state.hero.z;
+      const d2 = dx*dx + dz*dz;
+      if (d2 > arcRange*arcRange) continue;
+
+      const dirx = Math.cos(state.hero.facing);
+      const dirz = Math.sin(state.hero.facing);
+      const len = Math.sqrt(dx*dx + dz*dz) || 1;
+      const dot = (dx/len)*dirx + (dz/len)*dirz;
+
+      if (dot >= arcCos) {
+        damageEnemy(e, state.hero.dmg, "melee");
+        hits++;
+      }
+    }
+
+    if (hits > 0) {
+      pushMsg(`Aerin strikes with the ${state.hero.weapon}.`);
+    } else {
+      // subtle feedback
+      if (state.time - state.lastMsgAt > 0.75) pushMsg("Swing—nothing but air and shadows.");
+    }
+  }
+
+  function tryInteract() {
+    // shrine interaction
+    const r2 = 2.8*2.8;
+    for (const s of state.shrines) {
+      if (s.purified) continue;
+      if (dist2(s.x,s.z,state.hero.x,state.hero.z) <= r2) {
+        // require some light energy to purify, keeps it game-y but simple
+        const need = 30 + state.areaIndex*10;
+        if (state.hero.light < need) {
+          pushMsg(`Shrine resists. Need ${need} Light Energy.`);
+          return;
+        }
+        state.hero.light -= need;
+        purifyShrine(s);
+        pushMsg("Shrine purified. The darkness recoils.");
+        updateHUD();
+        return;
+      }
+    }
+
+    // gate interaction
+    if (state.gate && state.area.gateTo) {
+      if (dist2(state.gate.x,state.gate.z,state.hero.x,state.hero.z) <= 3.0*3.0) {
+        if (!state.gateUnlocked) {
+          pushMsg("The gate is sealed. Purify all shrines.");
+          return;
+        }
+        goToNextArea();
+        return;
+      }
+    }
+  }
+
+  function purifyShrine(shrine) {
+    shrine.purified = true;
+    state.shrinePurified++;
+    // visual: brighten ring and obelisk emissive
+    shrine.ring.material.opacity = 0.55;
+    shrine.obelisk.material.emissive = new THREE.Color(0x63d7ff);
+    shrine.obelisk.material.emissiveIntensity = 0.35;
+
+    // Reduce darkness baseline a bit
+    state.darkness = Math.max(0.55, state.darkness - 0.12);
+
+    // unlock gate if all shrines purified
+    if (state.shrinePurified >= state.shrineTotal) {
+      state.gateUnlocked = true;
+      if (state.gate) {
+        state.gate.unlocked = true;
+        state.gate.door.material.emissive = new THREE.Color(0xfff2a8);
+        state.gate.door.material.emissiveIntensity = 0.25;
+        state.gate.sigil.material.opacity = 0.6;
+      }
+      pushMsg("A path opens. The gate hums with warm light.");
+    }
+
+    // save progress
+    saveProgress();
+  }
+
+  function goToNextArea() {
+    const nextId = state.area.gateTo;
+    const nextIdx = Areas.findIndex(a => a.id === nextId);
+    if (nextIdx < 0) return;
+    saveProgress(nextIdx);
+    loadAreaByIndex(nextIdx);
+    pushMsg(`You step through into ${Areas[nextIdx].name}.`);
+  }
+
+  function damageEnemy(enemy, amount, source) {
+    enemy.hp = Math.max(0, enemy.hp - amount);
+    enemy.hitFlash = 0.12;
+
+    // tiny knockback away from hero
+    const dx = enemy.x - state.hero.x;
+    const dz = enemy.z - state.hero.z;
+    const len = Math.sqrt(dx*dx + dz*dz) || 1;
+    enemy.x += (dx/len) * 0.35;
+    enemy.z += (dz/len) * 0.35;
+
+    if (enemy.hp <= 0) {
+      // drop light energy
+      if (enemy.drop > 0) {
+        state.hero.light += enemy.drop;
+        pushMsg(`${enemy.name} dissolves. +${enemy.drop} Light Energy.`);
+      } else {
+        pushMsg(`${enemy.name} falls silent.`);
+      }
+      if (enemy.type === "The Dim Lord") {
+        winGame();
+      }
+    }
+  }
+
+  function damageHero(amount) {
+    if (state.hero.invuln > 0) return;
+    state.hero.hp = Math.max(0, state.hero.hp - amount);
+    state.hero.invuln = 0.4;
+    if (state.hero.hp <= 0) {
+      gameOver();
+    }
+  }
+
+  // =========================
+  // Skills
+  // =========================
+  function trySkillFlash() {
+    if (!state.hero.skill.flash) { pushMsg("Flash is not yet awakened."); return; }
+    if (state.hero.cd.flash > 0) return;
+
+    state.hero.cd.flash = 2.5;
+    // dash toward mouse
+    const tx = mouse.worldX, tz = mouse.worldZ;
+    const dx = tx - state.hero.x, dz = tz - state.hero.z;
+    const len = Math.sqrt(dx*dx + dz*dz) || 1;
+    const dash = 3.5;
+    state.hero.x += (dx/len)*dash;
+    state.hero.z += (dz/len)*dash;
+    clampHeroToBounds();
+    state.hero.invuln = 0.25;
+    pushMsg("Flash—Aerin blinks through the dark.");
+  }
+
+  function trySkillGlow() {
+    if (!state.hero.skill.glow) { pushMsg("Glow is not yet awakened."); return; }
+    if (state.hero.cd.glow > 0) return;
+    const cost = 35;
+
+    if (state.hero.light < cost) { pushMsg(`Need ${cost} Light Energy for Glow.`); return; }
+    state.hero.light -= cost;
+    state.hero.cd.glow = 6.5;
+
+    const heal = 30;
+    state.hero.hp = Math.min(state.hero.hpMax, state.hero.hp + heal);
+    pushMsg("Glow—Warmth stitches the wounds.");
+  }
+
+  function trySkillBeam() {
+    if (!state.hero.skill.beam) { pushMsg("Beam is not yet awakened."); return; }
+    if (state.hero.cd.beam > 0) return;
+    const cost = 20;
+    if (state.hero.light < cost) { pushMsg(`Need ${cost} Light Energy for Beam.`); return; }
+
+    state.hero.light -= cost;
+    state.hero.cd.beam = 1.4;
+
+    // Create projectile toward mouse
+    const tx = mouse.worldX, tz = mouse.worldZ;
+    const dx = tx - state.hero.x, dz = tz - state.hero.z;
+    const len = Math.sqrt(dx*dx + dz*dz) || 1;
+    const vx = (dx/len)*9.0;
+    const vz = (dz/len)*9.0;
+
+    const bolt = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 12), mat(0xfff2a8, 0xfff2a8, 1.1));
+    bolt.position.set(state.hero.x, 0.35, state.hero.z);
+    world.add(bolt);
+
+    state.hero.beamShots.push({
+      x: state.hero.x, z: state.hero.z,
+      vx, vz,
+      life: 1.2,
+      model: bolt
+    });
+
+    pushMsg("Beam—A spear of light cuts forward.");
+  }
+
+  // =========================
+  // Enemy AI
+  // =========================
+  function updateEnemyAI(e, dt) {
+    if (e.hp <= 0) return;
+
+    // Boss phases
+    if (e.type === "The Dim Lord") {
+      const pct = e.hp / e.hpMax;
+      if (pct < 0.66 && e.bossPhase === 1) { e.bossPhase = 2; pushMsg("The Dim Lord shifts—anger becomes hunger."); }
+      if (pct < 0.33 && e.bossPhase === 2) { e.bossPhase = 3; pushMsg("The Dim Lord fractures the air. The dark lashes faster."); }
+    }
+
+    // Determine if hero is within "light zone" near purified shrines (safer)
+    const heroInLight = isPointInShrineLight(state.hero.x, state.hero.z);
+
+    const dx = state.hero.x - e.x;
+    const dz = state.hero.z - e.z;
+    const d = Math.sqrt(dx*dx + dz*dz) || 1;
+
+    // enemies hesitate in purified light (simple: reduced speed/damage)
+    const lightPenalty = heroInLight ? 0.65 : 1.0;
+
+    e.cd = Math.max(0, e.cd - dt);
+
+    if (e.ai === "chase") {
+      const sp = e.speed * lightPenalty;
+      e.vx = (dx/d) * sp;
+      e.vz = (dz/d) * sp;
+
+      if (d < 1.35 && e.cd <= 0) {
+        e.cd = 0.8;
+        damageHero(Math.round(e.dmg * lightPenalty));
+      }
+    }
+
+    if (e.ai === "pounce") {
+      // wolves pounce periodically
+      const sp = e.speed * lightPenalty;
+      const pounceReady = e.cd <= 0 && d < 6.0;
+      if (pounceReady) {
+        e.cd = 1.6;
+        e.vx = (dx/d) * (sp * 2.2);
+        e.vz = (dz/d) * (sp * 2.2);
+      } else {
+        e.vx = (dx/d) * sp;
+        e.vz = (dz/d) * sp;
+      }
+
+      if (d < 1.2 && e.cd > 1.1) { // right after pounce
+        damageHero(Math.round(e.dmg * 1.2 * lightPenalty));
+      } else if (d < 1.15 && e.cd <= 0) {
+        e.cd = 0.85;
+        damageHero(Math.round(e.dmg * lightPenalty));
+      }
+    }
+
+    if (e.ai === "guard") {
+      // knight tries to keep medium distance; steps in to strike
+      const sp = e.speed * lightPenalty;
+      const desired = 2.3;
+      const dir = d > desired ? 1 : (d < 1.4 ? -1 : 0);
+      e.vx = (dx/d) * sp * dir;
+      e.vz = (dz/d) * sp * dir;
+
+      if (d < 1.55 && e.cd <= 0) {
+        e.cd = 1.1;
+        damageHero(Math.round(e.dmg * lightPenalty));
+      }
+    }
+
+    if (e.ai === "drain") {
+      // wraith circles and drains if close
+      const sp = e.speed * lightPenalty;
+      const tangentX = -dz/d;
+      const tangentZ = dx/d;
+
+      // circle at ~2.2 distance
+      const toward = d > 2.2 ? 1 : (d < 1.6 ? -1 : 0);
+      e.vx = (dx/d)*sp*toward + tangentX*sp*0.75;
+      e.vz = (dz/d)*sp*toward + tangentZ*sp*0.75;
+
+      if (d < 2.0) {
+        // drain light slowly; if none, hurt HP
+        if (state.hero.light > 0) state.hero.light = Math.max(0, state.hero.light - 10*dt);
+        else if (e.cd <= 0) { e.cd = 0.9; damageHero(Math.round(e.dmg * lightPenalty)); }
+      }
+    }
+
+    if (e.ai === "boss") {
+      // Dim Lord: slow stalk, periodic pulse + summons
+      const baseSp = e.speed * (e.bossPhase === 3 ? 1.15 : 1.0) * lightPenalty;
+      e.vx = (dx/d) * baseSp;
+      e.vz = (dz/d) * baseSp;
+
+      // melee swipe
+      if (d < 1.85 && e.cd <= 0) {
+        e.cd = 1.0 - (e.bossPhase-1)*0.15;
+        damageHero(Math.round(e.dmg * (1.0 + (e.bossPhase-1)*0.15) * lightPenalty));
+      }
+
+      // pulse every few seconds (separate timer using cd by offset)
+      e.userData ??= {};
+      e.userData.pulse = (e.userData.pulse ?? rand(1.2, 2.2)) - dt;
+
+      if (e.userData.pulse <= 0) {
+        e.userData.pulse = 3.2 - (e.bossPhase-1)*0.5;
+        bossPulse(e);
+      }
+
+      // summon adds in phase 2+
+      e.userData.summon = (e.userData.summon ?? 5.5) - dt;
+      if (e.bossPhase >= 2 && e.userData.summon <= 0) {
+        e.userData.summon = 6.0 - (e.bossPhase-2)*0.7;
+        summonAdds(e.bossPhase);
+      }
+    }
+
+    // Apply movement with wall bounds
+    e.x += e.vx * dt;
+    e.z += e.vz * dt;
+
+    // Clamp to bounds
+    const w = state.bounds.w/2 - 1.2;
+    const h = state.bounds.h/2 - 1.2;
+    e.x = clamp(e.x, -w, w);
+    e.z = clamp(e.z, -h, h);
+
+    // update model position
+    e.model.position.set(e.x, 0, e.z);
+
+    // hit flash
+    if (e.hitFlash > 0) {
+      e.hitFlash -= dt;
+      e.model.traverse(obj => {
+        if (obj.isMesh) obj.material.emissiveIntensity = 0.45;
+      });
+    } else {
+      e.model.traverse(obj => {
+        if (obj.isMesh) obj.material.emissiveIntensity = obj.material.emissiveIntensity ? lerp(obj.material.emissiveIntensity, 0.12, 0.08) : 0;
+      });
+    }
+  }
+
+  function bossPulse(boss) {
+    // radial pulse: if hero in range, damage + knockback
+    const range = 4.8;
+    const d2h = dist2(boss.x,boss.z,state.hero.x,state.hero.z);
+    if (d2h < range*range) {
+      damageHero(12 + (boss.bossPhase-1)*5);
+      const dx = state.hero.x - boss.x;
+      const dz = state.hero.z - boss.z;
+      const len = Math.sqrt(dx*dx + dz*dz) || 1;
+      state.hero.x += (dx/len)*1.1;
+      state.hero.z += (dz/len)*1.1;
+      clampHeroToBounds();
+    }
+    pushMsg("A dark pulse ripples out from the Spire.");
+
+    // visual ring
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.7, 0.9, 48),
+      new THREE.MeshBasicMaterial({ color:0xff5b7e, transparent:true, opacity:0.5, side:THREE.DoubleSide })
+    );
+    ring.rotation.x = -Math.PI/2;
+    ring.position.set(boss.x, 0.03, boss.z);
+    world.add(ring);
+
+    const pulse = { ring, t:0, max:range };
+    state._pulses ??= [];
+    state._pulses.push(pulse);
+  }
+
+  function summonAdds(phase) {
+    const types = phase === 2 ? ["Gloomling","Ash Wolf"] : ["Gloomling","Ash Wolf","Lantern Wraith"];
+    const count = phase === 2 ? 2 : 3;
+    for (let i=0;i<count;i++) {
+      const x = rand(-state.bounds.w/2+3, state.bounds.w/2-3);
+      const z = rand(-state.bounds.h/2+3, state.bounds.h/2-3);
+      if (dist2(x,z,state.hero.x,state.hero.z) < 25) continue;
+      spawnEnemy(pick(types), x, z);
+    }
+    pushMsg("The darkness sheds minions like sparks.");
+  }
+
+  // =========================
+  // Light Zones
+  // =========================
+  function isPointInShrineLight(x, z) {
+    // purified shrines project a light radius
+    for (const s of state.shrines) {
+      if (!s.purified) continue;
+      if (dist2(x,z,s.x,s.z) <= 6.0*6.0) return true;
+    }
+    return false;
+  }
+
+  // =========================
+  // Projectiles
+  // =========================
+  function updateBeams(dt) {
+    const shots = state.hero.beamShots;
+    for (let i=shots.length-1;i>=0;i--) {
+      const sh = shots[i];
+      sh.life -= dt;
+      sh.x += sh.vx*dt;
+      sh.z += sh.vz*dt;
+      sh.model.position.set(sh.x, 0.35, sh.z);
+
+      // collide with enemies
+      let hit = false;
+      for (const e of state.enemies) {
+        if (e.hp <= 0) continue;
+        if (dist2(sh.x, sh.z, e.x, e.z) < 0.75*0.75) {
+          damageEnemy(e, 22, "beam");
+          hit = true;
+          break;
+        }
+      }
+      if (hit || sh.life <= 0) {
+        world.remove(sh.model);
+        shots.splice(i,1);
+      }
+    }
+  }
+
+  function updatePulses(dt) {
+    if (!state._pulses) return;
+    for (let i=state._pulses.length-1;i>=0;i--) {
+      const p = state._pulses[i];
+      p.t += dt;
+      const r = lerp(0.7, p.max, clamp(p.t/0.7, 0, 1));
+      p.ring.geometry.dispose();
+      p.ring.geometry = new THREE.RingGeometry(r-0.18, r, 56);
+      p.ring.material.opacity = 0.5*(1 - clamp(p.t/0.7,0,1));
+      if (p.t > 0.7) {
+        world.remove(p.ring);
+        state._pulses.splice(i,1);
+      }
+    }
+  }
+
+  // =========================
+  // Hero Update
+  // =========================
+  function clampHeroToBounds() {
+    const w = state.bounds.w/2 - 1.1;
+    const h = state.bounds.h/2 - 1.1;
+    state.hero.x = clamp(state.hero.x, -w, w);
+    state.hero.z = clamp(state.hero.z, -h, h);
+  }
+
+  function updateHero(dt) {
+    const h = state.hero;
+
+    // cooldowns
+    h.atkCooldown = Math.max(0, h.atkCooldown - dt);
+    h.invuln = Math.max(0, h.invuln - dt);
+    h.cd.flash = Math.max(0, h.cd.flash - dt);
+    h.cd.glow = Math.max(0, h.cd.glow - dt);
+    h.cd.beam = Math.max(0, h.cd.beam - dt);
+
+    // movement
+    const up = keys.has("w");
+    const dn = keys.has("s");
+    const lf = keys.has("a");
+    const rt = keys.has("d");
+    const sprint = keys.has("shift");
+
+    let ix = (rt?1:0) + (lf?-1:0);
+    let iz = (dn?1:0) + (up?-1:0);
+
+    const len = Math.hypot(ix, iz);
+    if (len > 0) { ix /= len; iz /= len; }
+
+    const inLight = isPointInShrineLight(h.x, h.z);
+    // slightly faster in light
+    const sp = h.speed * (sprint ? 1.55 : 1.0) * (inLight ? 1.08 : 1.0);
+
+    h.vx = ix * sp;
+    h.vz = iz * sp;
+
+    h.x += h.vx * dt;
+    h.z += h.vz * dt;
+    clampHeroToBounds();
+
+    // face mouse
+    const dx = mouse.worldX - h.x;
+    const dz = mouse.worldZ - h.z;
+    h.facing = Math.atan2(dz, dx);
+
+    // update hero model
+    heroModel.position.set(h.x, 0, h.z);
+    heroModel.rotation.y = -h.facing;
+
+    // passive light trickle in purified zones
+    if (inLight) h.light += 8*dt;
+
+    // darkness chip damage if not in light and in later areas
+    const danger = (state.areaIndex >= 1);
+    if (danger && !inLight) {
+      const chip = (0.9 + state.areaIndex*0.25) * dt;
+      h.hp = Math.max(0, h.hp - chip);
+      if (h.hp <= 0) gameOver();
+    }
+  }
+
+  // =========================
+  // Visual Mood (darkness / brightening)
+  // =========================
+  function updateMood(dt) {
+    // global dim adjusted by shrine purification
+    const purifiedPct = state.shrineTotal ? (state.shrinePurified/state.shrineTotal) : 0;
+    const targetFog = 0.03 - purifiedPct*0.014 - state.areaIndex*0.003;
+    scene.fog.density = lerp(scene.fog.density, clamp(targetFog, 0.012, 0.04), 0.06);
+
+    // background color brightens a bit as purified
+    const base = new THREE.Color(0x1a2636);
+    const lift = new THREE.Color(0x2f4663);
+    const c = base.clone().lerp(lift, purifiedPct*0.65);
+    renderer.setClearColor(c, 1);
+
+    // lights
+    hemi.intensity = lerp(hemi.intensity, 0.58 + purifiedPct*0.35, 0.05);
+    dir.intensity = lerp(dir.intensity, 0.28 + purifiedPct*0.22, 0.05);
+
+    // shrine glow pulse
+    for (const s of state.shrines) {
+      if (!s.purified) continue;
+      const pulse = 0.25 + 0.15*Math.sin(state.time*2.5);
+      s.ring.material.opacity = 0.35 + pulse;
+      s.obelisk.material.emissiveIntensity = 0.22 + pulse*0.35;
+    }
+
+    // gate pulse when unlocked
+    if (state.gate) {
+      if (state.gateUnlocked) {
+        const pulse = 0.35 + 0.25*Math.sin(state.time*3.2);
+        state.gate.sigil.material.opacity = pulse;
+        state.gate.door.material.emissiveIntensity = 0.16 + pulse*0.25;
+      } else {
+        state.gate.sigil.material.opacity = 0.15;
+        state.gate.door.material.emissiveIntensity = 0.02;
+      }
+    }
+  }
+
+  // =========================
+  // HUD
+  // =========================
+  function updateHUD() {
+    areaTitle.textContent = state.area.name;
+    enemyCountEl.textContent = state.enemies.filter(e => e.hp > 0).length.toString();
+
+    const h = state.hero;
+    hpText.textContent = `${Math.ceil(h.hp)}/${h.hpMax}`;
+    hpFill.style.width = `${clamp((h.hp/h.hpMax)*100, 0, 100)}%`;
+
+    lightText.textContent = `${Math.floor(h.light)}`;
+    lightFill.style.width = `${clamp((h.light/200)*100, 0, 100)}%`;
+
+    shrineText.textContent = `${state.shrinePurified}/${state.shrineTotal} purified`;
+    gateText.textContent = state.area.gateTo ? (state.gateUnlocked ? "Gate: Unlocked" : "Gate: Locked") : "Gate: —";
+
+    weaponNameEl.textContent = state.hero.weapon;
+  }
+
+  // =========================
+  // Save / Load progress
+  // =========================
+  function saveProgress(forceAreaIndex=null) {
+    const data = {
+      areaIndex: forceAreaIndex ?? state.areaIndex,
+      hero: {
+        hp: state.hero.hp,
+        hpMax: state.hero.hpMax,
+        light: state.hero.light,
+        weapon: state.hero.weapon,
+        dmg: state.hero.dmg,
+        skill: state.hero.skill
+      }
+    };
+    writeSave(data);
+  }
+
+  function loadGameFromSaveOrNew() {
+    const save = loadSave();
+    if (!save) {
+      // new game defaults
+      state.hero.hp = state.hero.hpMax = 100;
+      state.hero.light = 0;
+      state.hero.weapon = "Rusted Sword";
+      state.hero.dmg = 18;
+      state.hero.skill = { flash:false, glow:false, beam:false };
+      loadAreaByIndex(0);
+      return;
+    }
+
+    // restore
+    state.hero.hp = clamp(save.hero?.hp ?? 100, 1, save.hero?.hpMax ?? 100);
+    state.hero.hpMax = save.hero?.hpMax ?? 100;
+    state.hero.light = save.hero?.light ?? 0;
+    state.hero.weapon = save.hero?.weapon ?? "Rusted Sword";
+    state.hero.dmg = save.hero?.dmg ?? 18;
+    state.hero.skill = save.hero?.skill ?? { flash:false, glow:false, beam:false };
+
+    loadAreaByIndex(clamp(save.areaIndex ?? 0, 0, Areas.length-1));
+    pushMsg("Progress loaded.");
+  }
+
+  // =========================
+  // End states
+  // =========================
+  function gameOver() {
+    state.running = false;
+    overlay.style.display = "flex";
+    document.getElementById("how").style.display = "none";
+    document.getElementById("card").querySelector("h2").textContent = "The light fades…";
+    document.getElementById("card").querySelector("p").innerHTML =
+      "Aerin falls, and the darkness spreads a little farther. Try again—shrines remember your steps.";
+    pushMsg("Game Over.");
+    saveProgress(state.areaIndex);
+  }
+
+  function winGame() {
+    state.running = false;
+    overlay.style.display = "flex";
+    document.getElementById("how").style.display = "none";
+    document.getElementById("card").querySelector("h2").textContent = "The Beacon Breathes";
+    document.getElementById("card").querySelector("p").innerHTML =
+      "The Dim Lord dissolves into quiet ash. Light returns—thin at first, then steady. Aerin stays to guard it.";
+    pushMsg("Victory!");
+    clearSave();
+  }
+
+  // =========================
+  // Main Loop
+  // =========================
+  let last = performance.now();
+  function tick(now) {
+    requestAnimationFrame(tick);
+    const dt = Math.min(0.033, (now-last)/1000);
+    last = now;
+
+    if (!state.running || state.paused) {
+      // still render for nice pause view
+      renderer.render(scene, camera);
+      return;
+    }
+
+    state.time += dt;
+    state.dt = dt;
+
+    // Advance story messages slowly if player waits
+    if (state.storyQueue.length && state.time - state.lastMsgAt > 5.5) {
+      pushMsg(state.storyQueue.shift());
+    }
+
+    updateHero(dt);
+    updateBeams(dt);
+    updatePulses(dt);
+
+    // Enemies
+    for (const e of state.enemies) updateEnemyAI(e, dt);
+
+    // Clean up dead enemy models (leave a moment for feedback)
+    for (let i=state.enemies.length-1;i>=0;i--) {
+      const e = state.enemies[i];
+      if (e.hp <= 0) {
+        // fade out quickly
+        e.model.traverse(obj => {
+          if (obj.isMesh) {
+            obj.material.transparent = true;
+            obj.material.opacity = (obj.material.opacity ?? 1);
+            obj.material.opacity = Math.max(0, (obj.material.opacity - dt*3.0));
+          }
+        });
+        if ((e.model.children[0]?.material?.opacity ?? 0) <= 0.01) {
+          world.remove(e.model);
+          state.enemies.splice(i,1);
+        }
+      }
+    }
+
+    // Camera follows hero smoothly
+    const tx = state.hero.x;
+    const tz = state.hero.z;
+    camera.position.x = lerp(camera.position.x, tx, 0.08);
+    camera.position.z = lerp(camera.position.z, tz, 0.08);
+    camera.lookAt(camera.position.x, 0, camera.position.z);
+
+    updateMood(dt);
+    updateHUD();
+
+    renderer.render(scene, camera);
+  }
+
+  // =========================
+  // Start / Buttons
+  // =========================
+  document.getElementById("startBtn").addEventListener("click", () => {
+    overlay.style.display = "none";
+    state.running = true;
+    state.paused = false;
+    loadGameFromSaveOrNew();
+    pushMsg(`Awaken, Lightbearer. Purify the shrine in ${state.area.name}.`);
+  });
+
+  document.getElementById("howBtn").addEventListener("click", () => {
+    const how = document.getElementById("how");
+    how.style.display = how.style.display === "none" ? "block" : "none";
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    clearSave();
+    pushMsg("Save cleared. Press Start to begin fresh.");
+    document.getElementById("card").querySelector("h2").textContent = "Echoes of the Last Light";
+    document.getElementById("card").querySelector("p").innerHTML =
+      "You are <b>Aerin</b>, the last Lightbearer. Restore shrines, push back the darkness, and reach the Black Spire.";
+  });
+
+  // =========================
+  // Boot visuals: show a little scene behind overlay
+  // =========================
+  loadAreaByIndex(0);
+  state.running = false;
+  state.paused = false;
+  heroModel.position.set(0,0,6);
+
+  tick(last);
+
+  // initial HUD
+  updateHUD();
+
+})();
+</script>
+</body>
+</html>
