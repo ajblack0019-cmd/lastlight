@@ -32,6 +32,16 @@
       font-size:12px; line-height:1.4;
     }
     #controls .k { display:inline-block; padding:1px 6px; border-radius:6px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.08); margin:0 2px; }
+    #minimapWrap {
+      position:absolute; right:12px; top:230px; z-index:2;
+      color:#e9f0ff; background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.12);
+      border-radius:12px; padding:10px 12px; width:200px; backdrop-filter: blur(6px);
+    }
+    #minimapWrap h3 { margin:0 0 8px 0; font-size:12px; letter-spacing:.3px; font-weight:700; opacity:.95; }
+    #minimap {
+      width:100%; height:auto; display:block; border-radius:10px;
+      background:rgba(10,14,22,.8); border:1px solid rgba(255,255,255,.1);
+    }
     #overlay {
       position:absolute; inset:0; z-index:3; display:flex; align-items:center; justify-content:center;
       background:radial-gradient(circle at 50% 40%, rgba(30,40,60,.9), rgba(5,7,10,.98));
@@ -129,6 +139,11 @@
     <div style="margin-top:8px; opacity:.88">
       Purify shrines to unlock the gate. Fight inside the light to stay safe.
     </div>
+  </div>
+
+  <div id="minimapWrap">
+    <h3>Minimap</h3>
+    <canvas id="minimap" width="180" height="180"></canvas>
   </div>
 
   <div id="bossBanner">BOSS: THE DIM LORD</div>
@@ -309,14 +324,16 @@
   const gateText = document.getElementById("gateText");
   const weaponNameEl = document.getElementById("weaponName");
   const bossBanner = document.getElementById("bossBanner");
+  const minimap = document.getElementById("minimap");
+  const minimapCtx = minimap.getContext("2d");
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x0b0f14, 0.045);
+  scene.fog = new THREE.FogExp2(0x1a2636, 0.02);
 
   const renderer = new THREE.WebGLRenderer({ antialias:true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setClearColor(0x0b0f14, 1);
+  renderer.setClearColor(0x1a2636, 1);
   wrap.appendChild(renderer.domElement);
 
   const aspect = () => window.innerWidth / window.innerHeight;
@@ -331,9 +348,9 @@
   camera.lookAt(0, 0, 0);
 
   // Lights (subtle; most look comes from materials)
-  const hemi = new THREE.HemisphereLight(0x9ad7ff, 0x101018, 0.65);
+  const hemi = new THREE.HemisphereLight(0xb9e6ff, 0x24354d, 0.95);
   scene.add(hemi);
-  const dir = new THREE.DirectionalLight(0xffffff, 0.35);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.6);
   dir.position.set(-10, 25, 10);
   scene.add(dir);
 
@@ -356,6 +373,178 @@
     new THREE.MeshLambertMaterial({ color });
 
   // =========================
+  // Sprite helpers (self-contained 2D art)
+  // =========================
+  function makeSpriteTexture(drawFn, size = 128) {
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, size, size);
+    drawFn(ctx, size);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.NearestFilter;
+    return tex;
+  }
+
+  function makeSprite(drawFn, size, scale) {
+    const tex = makeSpriteTexture(drawFn, size);
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(scale, scale, 1);
+    return sprite;
+  }
+
+  function drawGlow(ctx, size, color) {
+    const grad = ctx.createRadialGradient(size/2, size/2, size*0.1, size/2, size/2, size*0.48);
+    grad.addColorStop(0, color);
+    grad.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(size/2, size/2, size*0.48, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  const SpriteArt = {
+    hero: (ctx, size) => {
+      ctx.fillStyle = "#0f1b2c";
+      ctx.beginPath();
+      ctx.ellipse(size*0.5, size*0.58, size*0.18, size*0.24, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = "#1f72ff";
+      ctx.beginPath();
+      ctx.ellipse(size*0.5, size*0.62, size*0.14, size*0.2, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = "#ffeaa0";
+      ctx.beginPath();
+      ctx.arc(size*0.58, size*0.52, size*0.03, 0, Math.PI*2);
+      ctx.fill();
+      drawGlow(ctx, size, "rgba(255,240,180,0.5)");
+    },
+    gloomling: (ctx, size) => {
+      ctx.fillStyle = "#1b1f2a";
+      ctx.beginPath();
+      ctx.arc(size*0.5, size*0.6, size*0.18, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = "#fff2a8";
+      ctx.beginPath();
+      ctx.arc(size*0.45, size*0.58, size*0.03, 0, Math.PI*2);
+      ctx.arc(size*0.55, size*0.58, size*0.03, 0, Math.PI*2);
+      ctx.fill();
+    },
+    ashwolf: (ctx, size) => {
+      ctx.fillStyle = "#3a3f4a";
+      ctx.fillRect(size*0.28, size*0.56, size*0.44, size*0.18);
+      ctx.beginPath();
+      ctx.arc(size*0.72, size*0.6, size*0.09, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = "#ff8a66";
+      ctx.beginPath();
+      ctx.arc(size*0.76, size*0.6, size*0.03, 0, Math.PI*2);
+      ctx.fill();
+    },
+    hollowknight: (ctx, size) => {
+      ctx.fillStyle = "#2a2f39";
+      ctx.fillRect(size*0.36, size*0.5, size*0.28, size*0.28);
+      ctx.fillStyle = "#20252e";
+      ctx.fillRect(size*0.34, size*0.42, size*0.32, size*0.14);
+      ctx.fillStyle = "#fff2a8";
+      ctx.fillRect(size*0.4, size*0.48, size*0.2, size*0.04);
+    },
+    wraith: (ctx, size) => {
+      drawGlow(ctx, size, "rgba(99,215,255,0.7)");
+      ctx.fillStyle = "rgba(15,27,44,0.8)";
+      ctx.beginPath();
+      ctx.arc(size*0.5, size*0.58, size*0.14, 0, Math.PI*2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(99,215,255,0.9)";
+      ctx.lineWidth = size*0.04;
+      ctx.beginPath();
+      ctx.arc(size*0.5, size*0.58, size*0.2, 0, Math.PI*2);
+      ctx.stroke();
+    },
+    dimlord: (ctx, size) => {
+      ctx.fillStyle = "#1a0b12";
+      ctx.fillRect(size*0.36, size*0.44, size*0.28, size*0.36);
+      ctx.fillStyle = "#ff5b7e";
+      ctx.beginPath();
+      ctx.arc(size*0.5, size*0.44, size*0.14, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = "#fff2a8";
+      ctx.beginPath();
+      ctx.arc(size*0.5, size*0.54, size*0.03, 0, Math.PI*2);
+      ctx.fill();
+    },
+    shrine: (ctx, size) => {
+      ctx.fillStyle = "#2a2f39";
+      ctx.fillRect(size*0.34, size*0.62, size*0.32, size*0.14);
+      ctx.fillStyle = "#1f2430";
+      ctx.beginPath();
+      ctx.moveTo(size*0.5, size*0.22);
+      ctx.lineTo(size*0.32, size*0.62);
+      ctx.lineTo(size*0.68, size*0.62);
+      ctx.closePath();
+      ctx.fill();
+      drawGlow(ctx, size, "rgba(99,215,255,0.4)");
+    },
+    gate: (ctx, size) => {
+      ctx.strokeStyle = "#cfd6e6";
+      ctx.lineWidth = size*0.06;
+      ctx.strokeRect(size*0.28, size*0.28, size*0.44, size*0.44);
+      ctx.strokeStyle = "rgba(255,242,168,0.7)";
+      ctx.beginPath();
+      ctx.arc(size*0.5, size*0.5, size*0.14, 0, Math.PI*2);
+      ctx.stroke();
+    },
+    hut: (ctx, size) => {
+      ctx.fillStyle = "#2a3342";
+      ctx.fillRect(size*0.32, size*0.55, size*0.36, size*0.2);
+      ctx.fillStyle = "#1b222d";
+      ctx.beginPath();
+      ctx.moveTo(size*0.3, size*0.55);
+      ctx.lineTo(size*0.5, size*0.32);
+      ctx.lineTo(size*0.7, size*0.55);
+      ctx.closePath();
+      ctx.fill();
+    },
+    lamp: (ctx, size) => {
+      ctx.fillStyle = "#2b2b30";
+      ctx.fillRect(size*0.48, size*0.45, size*0.04, size*0.25);
+      ctx.fillStyle = "#fff2a8";
+      ctx.beginPath();
+      ctx.arc(size*0.5, size*0.42, size*0.07, 0, Math.PI*2);
+      ctx.fill();
+      drawGlow(ctx, size, "rgba(255,242,168,0.5)");
+    },
+    tree: (ctx, size) => {
+      ctx.fillStyle = "#1a1f28";
+      ctx.fillRect(size*0.48, size*0.45, size*0.04, size*0.2);
+      ctx.fillStyle = "#3a3f4a";
+      ctx.beginPath();
+      ctx.arc(size*0.5, size*0.4, size*0.16, 0, Math.PI*2);
+      ctx.fill();
+    },
+    pillar: (ctx, size) => {
+      ctx.fillStyle = "#2a2f39";
+      ctx.fillRect(size*0.44, size*0.4, size*0.12, size*0.35);
+      ctx.fillStyle = "#1f2430";
+      ctx.fillRect(size*0.4, size*0.36, size*0.2, size*0.06);
+    },
+    spine: (ctx, size) => {
+      ctx.fillStyle = "#0a0b10";
+      ctx.beginPath();
+      ctx.moveTo(size*0.5, size*0.2);
+      ctx.lineTo(size*0.38, size*0.78);
+      ctx.lineTo(size*0.62, size*0.78);
+      ctx.closePath();
+      ctx.fill();
+      drawGlow(ctx, size, "rgba(122,11,24,0.35)");
+    }
+  };
+
+  // =========================
   // Model Factory (Enemies + Locations)
   // =========================
   function makeModel(kind) {
@@ -364,121 +553,53 @@
 
     // A small drop shadow plane for readability
     const shadow = new THREE.Mesh(
-      new THREE.CircleGeometry(0.6, 24),
-      new THREE.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:0.28 })
+      new THREE.CircleGeometry(0.7, 24),
+      new THREE.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:0.2 })
     );
     shadow.rotation.x = -Math.PI/2;
     shadow.position.y = 0.01;
     g.add(shadow);
 
     if (kind === "hero") {
-      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 1.2, 14), mat(0x1f72ff, 0x09203a, 0.25));
-      body.position.y = 0.7;
-      g.add(body);
-
-      const hood = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 16), mat(0x0f1b2c, 0x1a2a55, 0.15));
-      hood.position.y = 1.35;
-      g.add(hood);
-
-      const glow = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.85, 32), new THREE.MeshBasicMaterial({ color:0xfff2a8, transparent:true, opacity:0.25 }));
-      glow.rotation.x = -Math.PI/2;
-      glow.position.y = 0.02;
-      g.add(glow);
-
-      const sword = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.9, 0.2), mat(0xd7dbe6, 0x101018, 0.1));
-      sword.position.set(0.65, 0.85, 0);
-      g.add(sword);
-
+      const sprite = makeSprite(SpriteArt.hero, 128, 2.6);
+      sprite.position.y = 1.2;
+      g.add(sprite);
       return g;
     }
 
-    // Enemy "models" (simple silhouettes)
+    // Enemy sprites (simple silhouettes)
     if (kind === "gloomling") {
-      const blob = new THREE.Mesh(new THREE.SphereGeometry(0.55, 18, 18), mat(0x1b1f2a, 0x000000, 0.0));
-      blob.position.y = 0.7;
-      g.add(blob);
-      const eye1 = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 10), mat(0xfff2a8, 0xfff2a8, 1.2));
-      const eye2 = eye1.clone();
-      eye1.position.set(-0.18, 0.78, 0.35);
-      eye2.position.set( 0.18, 0.78, 0.35);
-      g.add(eye1, eye2);
-      const spikes = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.55, 10), mat(0x0c0f16));
-      spikes.position.set(0, 1.35, 0);
-      g.add(spikes);
+      const sprite = makeSprite(SpriteArt.gloomling, 128, 2.3);
+      sprite.position.y = 1.1;
+      g.add(sprite);
       return g;
     }
 
     if (kind === "ashwolf") {
-      const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 0.7, 6, 14), mat(0x3a3f4a, 0x111318, 0.1));
-      torso.position.y = 0.75;
-      torso.rotation.z = Math.PI/2;
-      g.add(torso);
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 14, 14), mat(0x2f343f, 0x151820, 0.08));
-      head.position.set(0.55, 0.85, 0);
-      g.add(head);
-      const ear1 = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.22, 10), mat(0x20242c));
-      const ear2 = ear1.clone();
-      ear1.position.set(0.62, 1.1, 0.14);
-      ear2.position.set(0.62, 1.1, -0.14);
-      ear1.rotation.x = Math.PI/2;
-      ear2.rotation.x = Math.PI/2;
-      g.add(ear1, ear2);
-      const ember = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 10), mat(0xff8a66, 0xff8a66, 1.1));
-      ember.position.set(0.72, 0.86, 0);
-      g.add(ember);
+      const sprite = makeSprite(SpriteArt.ashwolf, 128, 2.2);
+      sprite.position.y = 1.0;
+      g.add(sprite);
       return g;
     }
 
     if (kind === "hollowknight") {
-      const armor = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.52, 1.3, 14), mat(0x2a2f39, 0x0f1014, 0.15));
-      armor.position.y = 0.75;
-      g.add(armor);
-      const helm = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.55, 0.5), mat(0x20252e, 0x0a0b0e, 0.18));
-      helm.position.y = 1.35;
-      g.add(helm);
-      const visor = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.12, 0.06), mat(0xfff2a8, 0xfff2a8, 1.0));
-      visor.position.set(0, 1.33, 0.28);
-      g.add(visor);
-      const sword = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.1, 0.2), mat(0xbfc5d2, 0x111318, 0.08));
-      sword.position.set(0.75, 0.85, 0);
-      g.add(sword);
+      const sprite = makeSprite(SpriteArt.hollowknight, 128, 2.4);
+      sprite.position.y = 1.15;
+      g.add(sprite);
       return g;
     }
 
     if (kind === "wraith") {
-      const core = new THREE.Mesh(new THREE.SphereGeometry(0.45, 16, 16), mat(0x0f1b2c, 0x63d7ff, 0.35));
-      core.position.y = 0.9;
-      g.add(core);
-      const halo = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.08, 10, 24), new THREE.MeshBasicMaterial({ color:0x63d7ff, transparent:true, opacity:0.55 }));
-      halo.position.y = 0.95;
-      halo.rotation.x = Math.PI/2;
-      g.add(halo);
-      const tail = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.0, 16), mat(0x0b0f14, 0x2bbcff, 0.25));
-      tail.position.y = 0.25;
-      tail.rotation.x = Math.PI;
-      g.add(tail);
+      const sprite = makeSprite(SpriteArt.wraith, 128, 2.6);
+      sprite.position.y = 1.25;
+      g.add(sprite);
       return g;
     }
 
     if (kind === "dimlord") {
-      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.95, 1.7, 18), mat(0x1a0b12, 0x7a0c1f, 0.25));
-      base.position.y = 0.9;
-      g.add(base);
-      const crown = new THREE.Mesh(new THREE.TorusGeometry(0.85, 0.12, 12, 28), new THREE.MeshBasicMaterial({ color:0xff5b7e, transparent:true, opacity:0.45 }));
-      crown.position.y = 1.8;
-      crown.rotation.x = Math.PI/2;
-      g.add(crown);
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 12), mat(0xfff2a8, 0xfff2a8, 1.4));
-      eye.position.set(0, 1.25, 0.55);
-      g.add(eye);
-      const spikes = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.7, 10), mat(0x2a0f18, 0x7a0c1f, 0.12));
-      for (let i=0;i<5;i++){
-        const s = spikes.clone();
-        const ang = i*(Math.PI*2/5);
-        s.position.set(Math.cos(ang)*0.85, 1.5, Math.sin(ang)*0.35);
-        s.rotation.z = ang;
-        g.add(s);
-      }
+      const sprite = makeSprite(SpriteArt.dimlord, 128, 3.0);
+      sprite.position.y = 1.4;
+      g.add(sprite);
       return g;
     }
 
@@ -489,9 +610,20 @@
     const grp = new THREE.Group();
 
     // ground
+    const groundTexture = makeSpriteTexture((ctx, size) => {
+      ctx.fillStyle = kind === "forest" ? "#2c3d2f" : (kind === "spire" ? "#2a1f2a" : "#2c3342");
+      ctx.fillRect(0, 0, size, size);
+      for (let i=0;i<120;i++) {
+        ctx.fillStyle = "rgba(255,255,255,0.05)";
+        ctx.fillRect(Math.random()*size, Math.random()*size, 2, 2);
+      }
+    }, 128);
+    groundTexture.wrapS = THREE.RepeatWrapping;
+    groundTexture.wrapT = THREE.RepeatWrapping;
+    groundTexture.repeat.set(areaBounds.w/6, areaBounds.h/6);
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(areaBounds.w, areaBounds.h),
-      new THREE.MeshStandardMaterial({ color:0x0f1520, roughness:1.0, metalness:0.0 })
+      new THREE.MeshStandardMaterial({ color:0xffffff, map: groundTexture, roughness:0.95, metalness:0.0 })
     );
     ground.rotation.x = -Math.PI/2;
     grp.add(ground);
@@ -513,55 +645,28 @@
       const z = rand(-areaBounds.h/2+2, areaBounds.h/2-2);
 
       if (kind === "village") {
-        // huts / posts
         const isHut = Math.random() < 0.35;
-        if (isHut) {
-          const hut = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.0, 0.9, 10), mat(0x2a3342));
-          hut.position.set(x, 0.45, z);
-          grp.add(hut);
-          const roof = new THREE.Mesh(new THREE.ConeGeometry(1.1, 0.8, 10), mat(0x1b222d));
-          roof.position.set(x, 1.1, z);
-          grp.add(roof);
-        } else {
-          const post = new THREE.Mesh(new THREE.BoxGeometry(0.25, 1.0, 0.25), mat(0x2b2b30));
-          post.position.set(x, 0.5, z);
-          grp.add(post);
-          const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 12), mat(0xfff2a8, 0xfff2a8, 0.8));
-          lamp.position.set(x, 1.05, z);
-          grp.add(lamp);
-        }
+        const sprite = makeSprite(isHut ? SpriteArt.hut : SpriteArt.lamp, 128, isHut ? 2.4 : 2.0);
+        sprite.position.set(x, 1.1, z);
+        grp.add(sprite);
       }
 
       if (kind === "forest") {
-        // trees (dark trunks + faint ash leaves)
-        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.25, 1.5, 10), mat(0x1a1f28));
-        trunk.position.set(x, 0.75, z);
-        grp.add(trunk);
-        const canopy = new THREE.Mesh(new THREE.SphereGeometry(rand(0.55,0.85), 14, 14), mat(0x3a3f4a, 0x2a2f39, 0.05));
-        canopy.position.set(x, 1.7, z);
-        grp.add(canopy);
+        const sprite = makeSprite(SpriteArt.tree, 128, rand(2.2, 2.8));
+        sprite.position.set(x, 1.4, z);
+        grp.add(sprite);
       }
 
       if (kind === "ruins") {
-        // broken pillars
-        const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.35, rand(0.6,1.7), 12), mat(0x2a2f39));
-        pillar.position.set(x, pillar.geometry.parameters.height/2, z);
-        pillar.rotation.y = rand(0, Math.PI);
-        grp.add(pillar);
-        if (Math.random()<0.25) {
-          const shard = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.2, 0.3), mat(0x1f2430));
-          shard.position.set(x+rand(-0.5,0.5), 0.1, z+rand(-0.5,0.5));
-          shard.rotation.y = rand(0, Math.PI);
-          grp.add(shard);
-        }
+        const sprite = makeSprite(SpriteArt.pillar, 128, rand(2.0, 2.6));
+        sprite.position.set(x, 1.2, z);
+        grp.add(sprite);
       }
 
       if (kind === "spire") {
-        // black spines
-        const spine = new THREE.Mesh(new THREE.ConeGeometry(rand(0.18,0.35), rand(1.0,2.6), 10), mat(0x0a0b10, 0x4a0b18, 0.08));
-        spine.position.set(x, spine.geometry.parameters.height/2, z);
-        spine.rotation.y = rand(0, Math.PI);
-        grp.add(spine);
+        const sprite = makeSprite(SpriteArt.spine, 128, rand(2.2, 2.8));
+        sprite.position.set(x, 1.4, z);
+        grp.add(sprite);
       }
     }
 
@@ -699,6 +804,10 @@
     const g = new THREE.Group();
     g.position.set(x, 0, z);
 
+    const shrineSprite = makeSprite(SpriteArt.shrine, 128, 3.0);
+    shrineSprite.position.y = 1.3;
+    g.add(shrineSprite);
+
     const base = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 1.1, 0.5, 16), mat(0x2a2f39));
     base.position.y = 0.25;
     g.add(base);
@@ -731,6 +840,10 @@
   function buildGate(x, z) {
     const g = new THREE.Group();
     g.position.set(x, 0, z);
+
+    const gateSprite = makeSprite(SpriteArt.gate, 128, 3.6);
+    gateSprite.position.y = 1.4;
+    g.add(gateSprite);
 
     const frame = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.0, 0.4), mat(0x2a2f39));
     frame.position.y = 1.0;
@@ -1385,12 +1498,12 @@
   function updateMood(dt) {
     // global dim adjusted by shrine purification
     const purifiedPct = state.shrineTotal ? (state.shrinePurified/state.shrineTotal) : 0;
-    const targetFog = 0.055 - purifiedPct*0.018 - state.areaIndex*0.004;
-    scene.fog.density = lerp(scene.fog.density, clamp(targetFog, 0.024, 0.06), 0.06);
+    const targetFog = 0.03 - purifiedPct*0.014 - state.areaIndex*0.003;
+    scene.fog.density = lerp(scene.fog.density, clamp(targetFog, 0.012, 0.04), 0.06);
 
     // background color brightens a bit as purified
-    const base = new THREE.Color(0x0b0f14);
-    const lift = new THREE.Color(0x142136);
+    const base = new THREE.Color(0x1a2636);
+    const lift = new THREE.Color(0x2f4663);
     const c = base.clone().lerp(lift, purifiedPct*0.65);
     renderer.setClearColor(c, 1);
 
@@ -1437,6 +1550,55 @@
     gateText.textContent = state.area.gateTo ? (state.gateUnlocked ? "Gate: Unlocked" : "Gate: Locked") : "Gate: —";
 
     weaponNameEl.textContent = state.hero.weapon;
+  }
+
+  function updateMinimap() {
+    const ctx = minimapCtx;
+    const w = minimap.width;
+    const h = minimap.height;
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.fillStyle = "rgba(12,18,28,0.9)";
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = "rgba(255,255,255,0.2)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(2, 2, w-4, h-4);
+
+    const halfW = state.bounds.w / 2;
+    const halfH = state.bounds.h / 2;
+    const pad = 12;
+    const scale = Math.min((w - pad * 2) / (halfW * 2), (h - pad * 2) / (halfH * 2));
+    const mapX = (x) => w / 2 + x * scale;
+    const mapY = (z) => h / 2 + z * scale;
+
+    // shrines
+    for (const s of state.shrines) {
+      ctx.fillStyle = s.purified ? "#6be2ff" : "#5a6b7f";
+      ctx.beginPath();
+      ctx.arc(mapX(s.x), mapY(s.z), 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // gate
+    if (state.gate) {
+      ctx.fillStyle = state.gateUnlocked ? "#ffeaa0" : "#9aa4b4";
+      ctx.fillRect(mapX(state.gate.x) - 3, mapY(state.gate.z) - 3, 6, 6);
+    }
+
+    // enemies
+    for (const e of state.enemies) {
+      if (e.hp <= 0) continue;
+      ctx.fillStyle = "#ff6b6b";
+      ctx.beginPath();
+      ctx.arc(mapX(e.x), mapY(e.z), 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // hero
+    ctx.fillStyle = "#ffeaa0";
+    ctx.beginPath();
+    ctx.arc(mapX(state.hero.x), mapY(state.hero.z), 4, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   // =========================
@@ -1518,6 +1680,7 @@
 
     if (!state.running || state.paused) {
       // still render for nice pause view
+      updateMinimap();
       renderer.render(scene, camera);
       return;
     }
@@ -1565,6 +1728,7 @@
 
     updateMood(dt);
     updateHUD();
+    updateMinimap();
 
     renderer.render(scene, camera);
   }
