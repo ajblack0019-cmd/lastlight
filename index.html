@@ -168,6 +168,17 @@
     const dx=ax-bx, dy=ay-by;
     return dx*dx + dy*dy;
   };
+  const distPointToSegment = (px, pz, ax, az, bx, bz) => {
+    const abx = bx - ax;
+    const abz = bz - az;
+    const apx = px - ax;
+    const apz = pz - az;
+    const abLen2 = abx*abx + abz*abz;
+    const t = abLen2 > 0 ? clamp((apx*abx + apz*abz) / abLen2, 0, 1) : 0;
+    const cx = ax + abx * t;
+    const cz = az + abz * t;
+    return Math.hypot(px - cx, pz - cz);
+  };
 
   // =========================
   // Save / Progress
@@ -541,6 +552,21 @@
       ctx.closePath();
       ctx.fill();
       drawGlow(ctx, size, "rgba(122,11,24,0.35)");
+    },
+    lightOrb: (ctx, size) => {
+      drawGlow(ctx, size, "rgba(120,240,255,0.7)");
+      ctx.fillStyle = "#fff2a8";
+      ctx.beginPath();
+      ctx.arc(size*0.5, size*0.5, size*0.08, 0, Math.PI*2);
+      ctx.fill();
+    },
+    dashFx: (ctx, size) => {
+      drawGlow(ctx, size, "rgba(120,240,255,0.45)");
+      ctx.strokeStyle = "rgba(255,242,168,0.6)";
+      ctx.lineWidth = size*0.05;
+      ctx.beginPath();
+      ctx.arc(size*0.5, size*0.5, size*0.22, 0, Math.PI*2);
+      ctx.stroke();
     }
   };
 
@@ -708,6 +734,8 @@
     enemies: [],
     shrines: [],
     gate: null,
+    lightOrbs: [],
+    lightOrbTimer: 3.5,
 
     storyQueue: [],
     lastMsgAt: 0,
@@ -797,6 +825,8 @@
     state.enemies.length = 0;
     state.shrines.length = 0;
     state.gate = null;
+    state.lightOrbs.length = 0;
+    state.lightOrbTimer = 3.5;
     bossBanner.style.display = "none";
   }
 
@@ -899,6 +929,19 @@
 
     state.enemies.push(enemy);
     return enemy;
+  }
+
+  function spawnLightOrb(x, z, amount = 12) {
+    const sprite = makeSprite(SpriteArt.lightOrb, 128, 1.6);
+    sprite.position.set(x, 0.9, z);
+    world.add(sprite);
+    state.lightOrbs.push({
+      x, z,
+      amount,
+      life: 12,
+      bob: rand(0, Math.PI * 2),
+      model: sprite
+    });
   }
 
   function spawnWave(wave) {
@@ -1103,6 +1146,7 @@
       if (enemy.drop > 0) {
         state.hero.light += enemy.drop;
         pushMsg(`${enemy.name} dissolves. +${enemy.drop} Light Energy.`);
+        spawnLightOrb(enemy.x, enemy.z, Math.max(6, Math.round(enemy.drop * 0.5)));
       } else {
         pushMsg(`${enemy.name} falls silent.`);
       }
@@ -1129,16 +1173,35 @@
     if (state.hero.cd.flash > 0) return;
 
     state.hero.cd.flash = 2.5;
-    // dash toward mouse
-    const tx = mouse.worldX, tz = mouse.worldZ;
-    const dx = tx - state.hero.x, dz = tz - state.hero.z;
-    const len = Math.sqrt(dx*dx + dz*dz) || 1;
-    const dash = 3.5;
-    state.hero.x += (dx/len)*dash;
-    state.hero.z += (dz/len)*dash;
+    const ix = (keys.has("d") ? 1 : 0) + (keys.has("a") ? -1 : 0);
+    const iz = (keys.has("s") ? 1 : 0) + (keys.has("w") ? -1 : 0);
+    let len = Math.hypot(ix, iz);
+    let dirx = len > 0 ? ix / len : Math.cos(state.hero.facing);
+    let dirz = len > 0 ? iz / len : Math.sin(state.hero.facing);
+    len = Math.hypot(dirx, dirz) || 1;
+
+    const dash = 4.2;
+    const startX = state.hero.x;
+    const startZ = state.hero.z;
+    state.hero.x += (dirx/len)*dash;
+    state.hero.z += (dirz/len)*dash;
     clampHeroToBounds();
     state.hero.invuln = 0.25;
-    pushMsg("Flash—Aerin blinks through the dark.");
+
+    const dashDamage = Math.round(state.hero.dmg * 0.6);
+    for (const e of state.enemies) {
+      if (e.hp <= 0) continue;
+      const dist = distPointToSegment(e.x, e.z, startX, startZ, state.hero.x, state.hero.z);
+      if (dist <= 1.1) damageEnemy(e, dashDamage, "dash");
+    }
+
+    const fx = makeSprite(SpriteArt.dashFx, 128, 2.0);
+    fx.position.set(startX, 0.2, startZ);
+    world.add(fx);
+    state._dashFx ??= [];
+    state._dashFx.push({ model: fx, t: 0, duration: 0.45 });
+
+    pushMsg("Flash—Aerin surges forward in a burst of light.");
   }
 
   function trySkillGlow() {
@@ -1427,6 +1490,44 @@
     }
   }
 
+  function updateDashFx(dt) {
+    if (!state._dashFx) return;
+    for (let i=state._dashFx.length-1;i>=0;i--) {
+      const fx = state._dashFx[i];
+      fx.t += dt;
+      const pct = clamp(fx.t / fx.duration, 0, 1);
+      fx.model.scale.setScalar(2.0 + pct * 2.0);
+      fx.model.material.opacity = 0.75 * (1 - pct);
+      if (pct >= 1) {
+        world.remove(fx.model);
+        state._dashFx.splice(i,1);
+      }
+    }
+  }
+
+  function updateLightOrbs(dt) {
+    for (let i=state.lightOrbs.length-1;i>=0;i--) {
+      const orb = state.lightOrbs[i];
+      orb.life -= dt;
+      orb.bob += dt * 3.2;
+      orb.model.position.y = 0.9 + Math.sin(orb.bob) * 0.12;
+      orb.model.material.opacity = Math.min(1, orb.life / 12 + 0.1);
+
+      if (dist2(orb.x, orb.z, state.hero.x, state.hero.z) <= 1.2*1.2) {
+        state.hero.light += orb.amount;
+        pushMsg(`Light gathered. +${orb.amount} Light Energy.`);
+        world.remove(orb.model);
+        state.lightOrbs.splice(i,1);
+        continue;
+      }
+
+      if (orb.life <= 0) {
+        world.remove(orb.model);
+        state.lightOrbs.splice(i,1);
+      }
+    }
+  }
+
   // =========================
   // Hero Update
   // =========================
@@ -1482,6 +1583,15 @@
 
     // passive light trickle in purified zones
     if (inLight) h.light += 8*dt;
+
+    state.lightOrbTimer -= dt;
+    if (state.lightOrbTimer <= 0) {
+      const spawnRadius = 6;
+      const ox = clamp(h.x + rand(-spawnRadius, spawnRadius), -state.bounds.w/2 + 2, state.bounds.w/2 - 2);
+      const oz = clamp(h.z + rand(-spawnRadius, spawnRadius), -state.bounds.h/2 + 2, state.bounds.h/2 - 2);
+      spawnLightOrb(ox, oz, 10 + state.areaIndex * 4);
+      state.lightOrbTimer = rand(6, 9);
+    }
 
     // darkness chip damage if not in light and in later areas
     const danger = (state.areaIndex >= 1);
@@ -1681,6 +1791,8 @@
     if (!state.running || state.paused) {
       // still render for nice pause view
       updateMinimap();
+      updateDashFx(0);
+      updateLightOrbs(0);
       renderer.render(scene, camera);
       return;
     }
@@ -1696,6 +1808,8 @@
     updateHero(dt);
     updateBeams(dt);
     updatePulses(dt);
+    updateDashFx(dt);
+    updateLightOrbs(dt);
 
     // Enemies
     for (const e of state.enemies) updateEnemyAI(e, dt);
